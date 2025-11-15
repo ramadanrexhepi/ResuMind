@@ -1,100 +1,226 @@
-# Getting Started with Create React App
+# ResuMind - AI Resume Optimizer 🚀
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> Transform your resume with AI-powered analysis and optimization. Get professional, ATS-friendly resumes in minutes.
 
-## Available Scripts
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)
 
-In the project directory, you can run:
+## 🌟 Features
 
-### `npm start`
+- **📄 Resume Upload & Analysis** - Upload PDF or DOCX resumes for instant AI-powered feedback
+- **🔗 LinkedIn Profile Analysis** - Analyze LinkedIn profiles directly with URL input
+- **🤖 GPT-4o Integration** - Leverage OpenAI's latest model for intelligent resume optimization
+- **✨ Professional PDF Generation** - Create beautifully formatted, ATS-compatible resumes
+- **📊 Detailed Scoring** - Get comprehensive scores across multiple resume categories
+- **💼 ATS Optimization** - Ensure your resume passes Applicant Tracking Systems
+- **🎯 Personalized Recommendations** - Receive actionable feedback to improve your resume
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🖼️ Screenshots
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+*Coming soon - Add screenshots of your app here*
 
-### `npm test`
+## 🛠️ Tech Stack
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Frontend
+- **React.js** - UI framework
+- **CSS3** - Styling with modern design
+- **Fetch API** - HTTP requests
 
-### `npm run build`
+### Backend
+- **Node.js** - Runtime environment
+- **Express.js** - Web framework
+- **MongoDB Atlas** - Cloud database
+- **OpenAI GPT-4o** - AI analysis engine
+- **Puppeteer** - PDF generation
+- **Multer** - File upload handling
+- **PDF-Parse** - PDF text extraction
+- **Mammoth** - DOCX file processing
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🚀 Getting Started
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Prerequisites
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- Node.js (v18 or higher)
+- MongoDB Atlas account (free tier available)
+- OpenAI API key
 
-### `npm run eject`
+### Installation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1. **Clone the repository**
+```bash
+   git clone https://github.com/ramadanrexhepi/ResuMind.git
+   cd ResuMind
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+2. **Install backend dependencies**
+```bash
+   cd backend
+   npm install
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+3. **Install frontend dependencies**
+```bash
+   cd ../frontend
+   npm install
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+4. **Configure environment variables**
 
-## Learn More
+   Create a `.env` file in the `backend` directory:
+```env
+   PORT=5050
+   MONGODB_URI=mongodb+srv://your_username:your_password@cluster0.xxxxx.mongodb.net/resumind
+   OPENAI_API_KEY=sk-your-openai-api-key-here
+   NODE_ENV=development
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+5. **Start the backend server**
+```bash
+   cd backend
+   npm start
+```
+   Backend will run on `http://localhost:5050`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+6. **Start the frontend (in a new terminal)**
+```bash
+   cd frontend
+   npm start
+```
+   Frontend will run on `http://localhost:3000`
 
-### Code Splitting
+## 📖 Usage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. **Upload Your Resume**
+   - Navigate to the upload page
+   - Choose a PDF or DOCX file
+   - Click "Analyze Resume"
 
-### Analyzing the Bundle Size
+2. **Or Analyze LinkedIn Profile**
+   - Enter your LinkedIn profile URL
+   - Click "Analyze Profile"
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+3. **Review Analysis**
+   - View detailed scores and feedback
+   - Read personalized recommendations
 
-### Making a Progressive Web App
+4. **Generate Optimized Resume**
+   - Click "Generate Optimized Resume"
+   - Download your professional PDF
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 🔧 API Endpoints
 
-### Advanced Configuration
+### Resume Analysis
+```http
+POST /api/analyze-resume
+Content-Type: multipart/form-data
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Parameters:
+- resume: File (PDF or DOCX)
+```
 
-### Deployment
+### LinkedIn Analysis
+```http
+POST /api/analyze-linkedin
+Content-Type: application/json
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-
-
-
-
-
-
-
-
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = "mongodb+srv://resumeai_user:Ramadan1974@@cluster0.voga4wa.mongodb.net/?appName=Cluster0";
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
-async function run() {
-  try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    await client.close();
-  }
+Body:
+{
+  "linkedinUrl": "https://www.linkedin.com/in/username"
 }
+```
+
+### Generate Resume
+```http
+POST /api/generate-resume
+Content-Type: application/json
+
+Body:
+{
+  "resumeText": "Full resume text...",
+  "linkedinUrl": "Optional LinkedIn URL"
+}
+```
+
+## 🌍 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PORT` | Backend server port | Yes |
+| `MONGODB_URI` | MongoDB connection string | Yes |
+| `OPENAI_API_KEY` | OpenAI API key | Yes |
+| `NODE_ENV` | Environment (development/production) | Yes |
+
+## 📁 Project Structure
+```
+ResuMind/
+├── backend/
+│   ├── server.js           # Express server
+│   ├── routes/            # API routes
+│   ├── uploads/           # Temporary file storage
+│   ├── package.json
+│   └── .env               # Environment variables (not in repo)
+├── frontend/
+│   ├── public/            # Static files
+│   ├── src/
+│   │   ├── components/    # React components
+│   │   ├── App.js        # Main app component
+│   │   └── index.js      # Entry point
+│   └── package.json
+├── .gitignore
+└── README.md
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 🐛 Known Issues
+
+- Large file uploads (>10MB) may timeout
+- LinkedIn scraping may be rate-limited
+
+## 📝 Future Enhancements
+
+- [ ] Multiple resume templates
+- [ ] Resume comparison feature
+- [ ] Job description matching
+- [ ] Cover letter generation
+- [ ] User authentication & saved resumes
+- [ ] Multi-language support
+- [ ] Mobile app
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 👨‍💻 Author
+
+**Ramadan Rexhepi**
+
+- GitHub: [@ramadanrexhepi](https://github.com/ramadanrexhepi)
+- Portfolio: [ramadanrexhepi.dev](https://ramadanrexhepi.dev)
+- LinkedIn: [linkedin.com/in/ramadanrexhepi](https://linkedin.com/in/ramadanrexhepi)
+
+## 🙏 Acknowledgments
+
+- OpenAI for GPT-4o API
+- MongoDB Atlas for cloud database
+- Create React App for frontend boilerplate
+- All contributors and users of ResuMind
+
+## 📞 Support
+
+For support, email ramadan@ramadanrexhepi.dev or open an issue on GitHub.
+
+---
+
+⭐ **Star this repo if you find it helpful!** ⭐
+
+Made with ❤️ by Ramadan Rexhepi
