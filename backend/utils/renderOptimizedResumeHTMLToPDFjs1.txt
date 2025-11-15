@@ -1,0 +1,624 @@
+// utils/renderOptimizedResumeHTMLToPDF.js
+const puppeteer = require("puppeteer");
+const OpenAI = require("openai");
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+
+
+async function renderOptimizedResumeHTMLToPDF(res, formData, filename = "AI_Resume.pdf") {
+  try {
+    console.log("🎨 Generating AI resume...");
+    
+
+    // --- Robust extraction of LinkedIn and portfolio URLs ---
+    const linkedinUrl =
+      formData.linkedinUrl ||
+      formData.linkedin ||
+      formData.url ||
+      (formData.data && formData.data.linkedinUrl) ||
+      (formData.analysis && formData.analysis.linkedinUrl) ||
+      "NOT PROVIDED";
+
+    const portfolioUrl =
+      formData.portfolioUrl ||
+      formData.portfolio ||
+      (formData.data && formData.data.portfolioUrl) ||
+      (formData.analysis && formData.analysis.portfolioUrl) ||
+      "";
+
+    console.log("🌐 LinkedIn:", linkedinUrl);
+    console.log("🌐 Portfolio:", portfolioUrl);
+
+    // ---------- PROMPT ----------
+    const prompt = `
+    ═══════════════════════════════════════════════════════════════════════════════
+                        PROFESSIONAL RESUME GENERATION FROM LINKEDIN
+                             Expert LinkedIn Profile Analysis
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    ROLE & EXPERTISE:
+    You are an elite resume writer and LinkedIn profile analyst with 15+ years of experience transforming LinkedIn profiles into interview-generating resumes for Fortune 500 companies, FAANG organizations, and top-tier consulting firms. You specialize in extracting hidden value from LinkedIn profiles and translating social professional content into formal, achievement-driven resume language. Your resumes have a 95% interview callback rate.
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PRIMARY OBJECTIVE:
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    Analyze the provided LinkedIn profile URL and any supplementary data, then generate an EXCEPTIONAL, professionally-formatted PDF resume that positions the candidate as a top-tier professional. Extract every detail from their LinkedIn profile, transform casual LinkedIn language into powerful resume statements, and create a document that immediately captures hiring manager attention.
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PHASE 1: COMPREHENSIVE LINKEDIN PROFILE ANALYSIS
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    STEP 1 - EXTRACT COMPLETE PROFILE DATA:
+    
+    Access and thoroughly analyze the LinkedIn profile at: ${formData.linkedinUrl || "NOT PROVIDED"}
+    ${formData.portfolioUrl ? `Portfolio/Website: ${formData.portfolioUrl}` : ''}
+    
+    Extract the following information systematically:
+    
+    A) HEADER & CONTACT INFORMATION:
+       □ Full name (as displayed on LinkedIn)
+       □ Current headline/professional title
+       □ Location (City, State/Country)
+       □ Email address (if visible or provided)
+       □ Phone number (if visible or provided)
+       □ LinkedIn URL (clean, formatted)
+       □ Portfolio/website URL (if present in profile)
+       □ GitHub, Twitter, or other professional links
+    
+    B) ABOUT/SUMMARY SECTION:
+       □ Extract entire "About" section content
+       □ Identify years of experience mentioned
+       □ Note specializations and expertise areas
+       □ Extract key achievements or metrics mentioned
+       □ Identify unique value propositions
+       □ Note career goals or aspirations
+       □ Extract any quantifiable accomplishments
+    
+    C) EXPERIENCE SECTION (For EACH Position):
+       □ Exact job title
+       □ Company name (official name, proper capitalization)
+       □ Company location (City, State/Country)
+       □ Employment duration (Start Date - End Date or "Present")
+       □ Calculate total months/years in each role
+       □ Full job description text
+       □ All bullet points or achievements listed
+       □ Extract ALL numbers, metrics, or quantifiable results
+       □ Note technologies, tools, or platforms mentioned
+       □ Identify team sizes, budgets, or scale indicators
+       □ Extract any awards, recognition, or promotions
+       □ Note projects, initiatives, or special assignments
+    
+    D) EDUCATION SECTION (For EACH Degree):
+       □ Degree type and level
+       □ Field of study/Major
+       □ Institution name (official name)
+       □ Institution location
+       □ Graduation year (or expected graduation)
+       □ GPA if listed (only note if 3.5+)
+       □ Honors, awards, or distinctions
+       □ Relevant activities, clubs, or leadership roles
+       □ Notable coursework or academic projects
+    
+    E) SKILLS & ENDORSEMENTS:
+       □ All listed skills (prioritize by endorsement count)
+       □ Programming languages and frameworks
+       □ Tools and technologies
+       □ Software and platforms
+       □ Methodologies (Agile, Scrum, etc.)
+       □ Soft skills mentioned anywhere in profile
+       □ Language proficiencies with levels
+    
+    F) LICENSES & CERTIFICATIONS:
+       □ Certification name
+       □ Issuing organization
+       □ Issue date and expiration (if applicable)
+       □ Credential ID or URL if provided
+       □ Extract all certifications, even expired ones (note status)
+    
+    G) PROJECTS (If Section Exists):
+       □ Project name
+       □ Project description
+       □ Technologies used
+       □ Role in project
+       □ Dates (start and end)
+       □ Project URL or demo link
+       □ Team size or collaborators
+    
+    H) ACCOMPLISHMENTS:
+       □ Publications (title, publisher, date, URL)
+       □ Patents (title, number, status, date)
+       □ Courses (name, issuer, completion date)
+       □ Organizations/memberships
+       □ Honors & Awards
+       □ Test scores (if professionally relevant)
+       □ Speaking engagements or conferences
+    
+    I) RECOMMENDATIONS:
+       □ Extract themes from recommendations
+       □ Note recurring skills or strengths mentioned
+       □ Identify quantifiable achievements mentioned by others
+       □ Extract specific projects or accomplishments praised
+    
+    J) VOLUNTEER EXPERIENCE:
+       □ Organization name
+       □ Role/position
+       □ Dates (if provided)
+       □ Description of activities
+       □ Impact or achievements
+    
+    STEP 2 - ANALYZE & SYNTHESIZE:
+    - Identify the candidate's primary career focus and expertise
+    - Determine career level (entry, mid, senior, executive)
+    - Calculate total years of professional experience
+    - Identify most impressive achievements with metrics
+    - Note career progression and growth trajectory
+    - Identify gaps or areas needing enhancement
+    - Determine appropriate resume length (1-2 pages)
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PHASE 2: LINKEDIN-TO-RESUME CONTENT TRANSFORMATION
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    CRITICAL TRANSFORMATION RULES:
+    
+    1. CONVERT CASUAL TO PROFESSIONAL:
+       LinkedIn: "I'm passionate about building scalable systems"
+       Resume: "Software Architect specializing in scalable distributed systems"
+    
+       LinkedIn: "Helped the team improve our processes"
+       Resume: "Led process optimization initiative reducing deployment time by 40%"
+    
+    2. EXTRACT AND QUANTIFY:
+       - Find ALL numbers buried in LinkedIn descriptions
+       - Convert vague statements to specific metrics
+       - Transform narrative text into bullet points
+       - Calculate percentages, ROI, or impact when data allows
+    
+       LinkedIn: "Managed a team and delivered multiple projects successfully"
+       Resume: "Led cross-functional team of 8 engineers delivering 12 projects on time, with 95% stakeholder satisfaction rate"
+    
+    3. POWER VERB TRANSFORMATION:
+       Replace LinkedIn's casual language with strong action verbs:
+       - "Helped" → Led, Facilitated, Enabled, Drove
+       - "Worked on" → Developed, Architected, Engineered, Built
+       - "Responsible for" → Managed, Directed, Orchestrated, Oversaw
+       - "Involved in" → Contributed to, Executed, Implemented, Delivered
+    
+    4. ACHIEVEMENT-FOCUSED REWRITING:
+       Transform every responsibility into an achievement using CAR method:
+       - Challenge: What problem existed?
+       - Action: What specific action did they take?
+       - Result: What measurable outcome occurred?
+    
+    5. EXTRACT HIDDEN METRICS:
+       From text like "large-scale application" → "application serving 5M+ users"
+       From "improved performance" → "improved performance by 60%"
+       From "small team" → "team of 4-6 engineers"
+       Use reasonable estimates based on context if exact numbers unavailable
+    
+    6. SKILLS CONSOLIDATION:
+       - Group similar LinkedIn skills into categories
+       - Prioritize skills with most endorsements
+       - Add industry-standard terminology
+       - Remove redundant or outdated skills
+       - Organize by: Technical, Soft Skills, Languages
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PHASE 3: RESUME STRUCTURE & CONTENT GENERATION
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    BUILD RESUME IN THIS EXACT ORDER:
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 1. HEADER SECTION                                                           │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       • Full Name (from LinkedIn, 28-32pt, bold, centered)
+       • Professional Title (from LinkedIn headline or derived from experience)
+       • Contact: Email | Phone | Location
+       • Links: LinkedIn | Portfolio | GitHub (all URLs from profile)
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 2. PROFESSIONAL SUMMARY (3-4 powerful sentences)                           │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       Transform LinkedIn "About" section into formal summary:
+       • [Title/Level] with [X years] experience in [Industry/Domain]
+       • Core expertise in [Top 5-7 skills from profile]
+       • Track record of [2-3 major achievements from experience section]
+       • Known for [unique strengths from recommendations/skills]
+    
+       Example:
+       "Senior Full Stack Engineer with 8+ years of experience building scalable web applications for fintech and e-commerce sectors. Expert in React, Node.js, Python, AWS, and microservices architecture. Proven track record of leading teams to deliver products serving 10M+ users while reducing infrastructure costs by 35%. Recognized for technical leadership, mentoring junior developers, and bridging communication between engineering and business stakeholders."
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 3. PROFESSIONAL EXPERIENCE                                                  │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       For EACH LinkedIn position, create entry with:
+       
+       Format:
+       Job Title | Company Name, Location          [Month Year - Month Year/Present]
+       
+       Content (4-6 achievement bullets):
+       • Transform each LinkedIn bullet into powerful achievement statement
+       • Start with varied action verbs (Led, Architected, Delivered, Optimized)
+       • Include ALL quantifiable metrics from LinkedIn
+       • Add estimated metrics where reasonable based on context
+       • Highlight technical skills used
+       • Show impact on business, team, or users
+       
+       Bullet Formula: [Action Verb] + [What You Did] + [Technologies/Methods] + [Quantifiable Result/Impact]
+       
+       Example transformation:
+       LinkedIn: "Led development of new features for the platform"
+       Resume: "Architected and delivered 15+ new platform features using React and Node.js, increasing user engagement by 42% and reducing customer churn by 18%"
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 4. EDUCATION                                                                │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       For EACH degree from LinkedIn:
+       Format:
+       Degree in Field of Study | Institution Name, Location          [Graduation Year]
+       GPA: X.X/4.0 (only if 3.5+) | Honors: [Dean's List, Cum Laude, etc.]
+       
+       Include relevant coursework or academic projects if recent graduate
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 5. SKILLS & EXPERTISE                                                       │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       Organize LinkedIn skills into categories:
+       
+       Technical: [All technical skills, tools, languages, frameworks - comma separated]
+       Soft Skills: [Leadership, communication, etc. - comma separated]
+       Languages: [Language (Proficiency level)]
+       
+       Prioritize by:
+       1. Skills with most endorsements
+       2. Skills mentioned in experience descriptions
+       3. Current/relevant technologies
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 6. PROJECTS (Include if present on LinkedIn and impressive)                │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       For notable projects:
+       Project Name | Technologies: [tech stack]
+       [1-2 sentence description]
+       • [Key achievement or impact]
+       • [Technical highlight or innovation]
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ 7. CERTIFICATIONS & AWARDS                                                 │
+    └─────────────────────────────────────────────────────────────────────────────┘
+       From LinkedIn certifications and accomplishments:
+       Certification Name | Issuing Organization | Date
+       (List most recent and relevant first)
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PHASE 4: PDF FORMATTING & STYLING REQUIREMENTS
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    ⚠️ CRITICAL FORMATTING RULES - FOLLOW EXACTLY:
+    
+    LAYOUT & STRUCTURE:
+    ✓ Single-page clean layout (2 pages max if 10+ years experience)
+    ✓ White background, professional appearance
+    ✓ ALL content left-aligned (ONLY dates right-aligned)
+    ✓ NO two-column layouts
+    ✓ NO nested bullet points - all bullets flat at same level
+    ✓ Standard margins: 0.5-0.75 inches all sides
+    
+    TYPOGRAPHY:
+    ✓ Font: Helvetica, Helvetica Neue, or Arial
+    ✓ Name: 28-32pt, bold, centered
+    ✓ Section headers: 13-15pt, bold, uppercase
+    ✓ Job titles: 11-13pt, bold
+    ✓ Body text/bullets: 10-11pt, regular
+    ✓ Dates: 9-10pt, right-aligned only
+    ✓ Contact info: 9-10pt, centered
+    
+    COLOR SCHEME:
+    ✓ Primary text: #1e293b or #334155 (dark slate)
+    ✓ Accent: #2563eb (professional blue) for section bars, bullets, company names
+    ✓ Secondary text: #64748b (medium gray) for dates
+    ✓ Dividers: #cbd5e1 or #e2e8f0 (light gray)
+    ✓ Links: #2563eb, no underlines
+    
+    VISUAL ELEMENTS:
+    ✓ Top accent bar: 4px height, full width, #2563eb
+    ✓ Section headers: 4px left accent bar before each title
+    ✓ Section titles: PROFESSIONAL SUMMARY, PROFESSIONAL EXPERIENCE, EDUCATION, SKILLS, CERTIFICATIONS
+    ✓ Divider line below header: 1px, light gray
+    ✓ Bullets: Small circles (•), 2-4px, blue accent color
+    
+    BULLET POINTS (CRITICAL):
+    ✓ Simple circular bullets (•) only
+    ✓ ALL bullets at SAME indentation level (12-18px from margin)
+    ✓ NO nested or sub-bullets under ANY circumstances
+    ✓ NO hierarchical structure
+    ✓ 8-15px spacing between bullets
+    ✓ Each bullet: 1-2 lines maximum
+    
+    SPACING:
+    ✓ Line height: 1.5-1.7 for body text
+    ✓ Section spacing: 20-30px between sections
+    ✓ Bullet spacing: 8-15px between bullets
+    ✓ Entry spacing: 15-25px between experience/education entries
+    
+    PROHIBITED:
+    ✗ NO nested bullets
+    ✗ NO right-aligned content except dates
+    ✗ NO tables for layout
+    ✗ NO text boxes or containers
+    ✗ NO photos or graphics
+    ✗ NO decorative fonts
+    ✗ NO colored backgrounds
+    ✗ NO first-person pronouns (I, me, my)
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PHASE 5: QUALITY ASSURANCE CHECKLIST
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    Before finalizing, verify:
+    
+    CONTENT QUALITY:
+    □ All LinkedIn information accurately extracted and included
+    □ Casual LinkedIn language transformed to professional resume language
+    □ Every bullet starts with strong action verb (no repeating verbs)
+    □ At least 60% of bullets include quantifiable metrics
+    □ No spelling errors or typos
+    □ No grammatical mistakes
+    □ Past tense for previous roles, present tense for current role
+    □ Professional tone throughout (no casual LinkedIn phrasing)
+    □ Industry-appropriate terminology
+    
+    FORMATTING QUALITY:
+    □ ALL content left-aligned except dates
+    □ NO nested bullet points anywhere
+    □ Consistent spacing throughout
+    □ Section headers clearly distinguished with accent bars
+    □ Dates consistently formatted (Month Year – Month Year)
+    □ Font sizes appropriate per element type
+    □ Colors applied professionally and consistently
+    □ Clean, modern visual appearance
+    □ Easy to scan in 6 seconds
+    
+    ATS COMPATIBILITY:
+    □ Simple, clean structure (no complex formatting)
+    □ Standard section headers
+    □ Keywords from LinkedIn naturally incorporated
+    □ No tables used for layout
+    □ Standard fonts only
+    □ Proper bullet point formatting
+    □ Searchable, selectable text
+    
+    COMPLETENESS:
+    □ All LinkedIn sections represented appropriately
+    □ All certifications included
+    □ All education entries included
+    □ Skills comprehensively listed
+    □ Projects included if present and relevant
+    □ No critical information omitted
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    PHASE 6: PDF GENERATION & OUTPUT
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    GENERATE PDF USING PROVIDED PDF GENERATION CODE WITH:
+    
+    File Structure:
+    {
+      name: "[Full Name from LinkedIn]",
+      title: "[Professional title from LinkedIn headline]",
+      email: "[Email if available]",
+      phone: "[Phone if available]",
+      location: "[Location from LinkedIn]",
+      linkedin: "${formData.linkedinUrl || ''}",
+      portfolio: "${formData.portfolioUrl || ''}",
+      summary: "[Transformed professional summary]",
+      experiences: [
+        {
+          position: "[Job title]",
+          company: "[Company name]",
+          location: "[City, State/Country]",
+          startDate: "[Month Year]",
+          endDate: "[Month Year or Present]",
+          currentlyWorking: [true/false],
+          responsibilities: [
+            "[Achievement bullet 1]",
+            "[Achievement bullet 2]",
+            "[Achievement bullet 3]",
+            "[Achievement bullet 4]"
+          ]
+        }
+      ],
+      education: [
+        {
+          degree: "[Degree type]",
+          field: "[Field of study]",
+          institution: "[Institution name]",
+          location: "[City, State]",
+          graduationYear: "[Year]",
+          gpa: "[X.X if 3.5+]"
+        }
+      ],
+      skills: {
+        technical: "[Comma-separated technical skills]",
+        soft: "[Comma-separated soft skills]",
+        languages: "[Languages with proficiency]"
+      },
+      certifications: [
+        {
+          name: "[Cert name]",
+          issuer: "[Organization]",
+          date: "[Month Year]"
+        }
+      ]
+    }
+    
+    OUTPUT REQUIREMENTS:
+    ✓ Professional PDF filename: [FirstName]_[LastName]_Resume.pdf
+    ✓ Optimized for both digital viewing and printing
+    ✓ File size under 2MB
+    ✓ All fonts embedded
+    ✓ Hyperlinks functional
+    ✓ Ready for immediate submission to companies
+    ✓ ATS-compatible structure
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    EXECUTION INSTRUCTIONS
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    BEGIN TASK NOW:
+    
+    1. Access and analyze LinkedIn profile URL: ${formData.linkedinUrl || 'NOT PROVIDED'}
+    2. Extract ALL information from every section of the LinkedIn profile
+    3. Transform LinkedIn content using achievement-oriented resume language
+    4. Structure data following resume format specifications
+    5. Apply all formatting rules (especially left-alignment and flat bullets)
+    6. Generate professional PDF using provided generation code
+    7. Verify against quality assurance checklist
+    
+    ADDITIONAL DATA PROVIDED:
+    ${JSON.stringify(formData, null, 2)}
+    
+    ⚠️ CRITICAL REMINDERS:
+    • Extract EVERYTHING from LinkedIn - don't skip any sections
+    • Transform casual language to professional resume language
+    • Quantify ALL achievements with numbers when possible
+    • Use past tense for past roles, present tense for current role
+    • ALL bullets at SAME level - NO nesting under any circumstances
+    • ALL content left-aligned except dates (right-aligned)
+    • Follow color scheme and typography specifications exactly
+    
+    QUALITY STANDARD:
+    This resume must be exceptional enough to secure interviews at Fortune 500 companies, FAANG organizations, and top-tier consulting firms. It should represent the absolute best possible version of the candidate's professional story based on their LinkedIn profile.
+    
+    Your goal: Transform their LinkedIn profile into a resume that makes hiring managers say "We need to interview this person immediately."
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+                                  BEGIN ANALYSIS NOW
+    ═══════════════════════════════════════════════════════════════════════════════
+    `;
+    
+    
+    
+    
+    
+
+    // ---------- CALL OPENAI ----------
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are an expert resume architect." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.6,
+      max_tokens: 4000,
+    });
+
+    let html = completion.choices[0].message.content?.trim() || "";
+    html = html.replace(/^```(html)?/gi, "").replace(/```$/g, "").trim();
+
+    // ---------- VALIDATE OUTPUT ----------
+    if (!html.startsWith("<!DOCTYPE html")) {
+      console.warn("⚠️ Invalid HTML from AI, reformatting...");
+      const fixPrompt = `
+The following content is not valid HTML. Convert it into a **fully valid resume HTML document**
+that follows modern professional design using inline CSS and improved information from the data and the linkedin link together with the portfolio link.
+
+Content to fix:
+${html}
+      `;
+      const retry = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are an HTML resume formatter." },
+          { role: "user", content: fixPrompt },
+        ],
+        temperature: 0.4,
+        max_tokens: 3500,
+      });
+      html = retry.choices[0].message.content
+        .replace(/^```(html)?/gi, "")
+        .replace(/```$/g, "")
+        .trim();
+    }
+
+    // ---------- FINAL CHECK ----------
+    if (!html.startsWith("<!DOCTYPE html")) {
+        console.warn("⚠️ Still invalid HTML — wrapping content in fallback template...");
+      
+        html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>AI Resume</title>
+          <style>
+            body {
+              font-family: Helvetica, Arial, sans-serif;
+              color: #1e293b;
+              margin: 40px;
+              line-height: 1.6;
+            }
+            h1, h2 {
+              color: #2563eb;
+              border-bottom: 2px solid #2563eb;
+              padding-bottom: 4px;
+            }
+            ul { list-style-type: disc; padding-left: 20px; }
+            .section { margin-bottom: 24px; }
+          </style>
+        </head>
+        <body>
+          <h1>AI-Generated Resume</h1>
+          <div class="section">
+            ${html
+              .replace(/<\/?[^>]+(>|$)/g, "") // strip broken tags
+              .replace(/\n/g, "<br/>")} 
+          </div>
+        </body>
+        </html>`;
+      }
+
+    console.log("✅ Valid HTML received. Rendering PDF...");
+
+    // ---------- PUPPETEER ----------
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" },
+    });
+
+    await browser.close();
+
+    if (!pdfBuffer || pdfBuffer.length < 5000) {
+      console.error("⚠️ Empty or invalid PDF generated.");
+      res.status(500).json({ error: "Generated PDF invalid" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Transfer-Encoding", "binary");
+    res.end(pdfBuffer, "binary");
+
+    console.log("🎉 AI resume PDF ready.");
+  } catch (error) {
+    console.error("❌ Error rendering resume:", error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Failed to generate AI-designed resume",
+        message: error.message,
+      });
+    }
+  }
+}
+
+module.exports = { renderOptimizedResumeHTMLToPDF };

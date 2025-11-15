@@ -1,0 +1,76 @@
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
+
+async function renderResumeHTMLToPDF(res, data, filename = 'resume.pdf') {
+  // Load the base HTML template
+  const templatePath = path.join(__dirname, 'resumeTemplate.html');
+  let html = fs.readFileSync(templatePath, 'utf8');
+
+  // Inject data placeholders into the HTML
+  html = html
+    .replace(/{{fullName}}/g, data.fullName || 'Candidate Name')
+    .replace(/{{email}}/g, data.email || '')
+    .replace(/{{phone}}/g, data.phone || '')
+    .replace(/{{location}}/g, data.location || '')
+    .replace(/{{linkedin}}/g, data.linkedin || '')
+    .replace(/{{portfolio}}/g, data.portfolio || '')
+    .replace(/{{summary}}/g, data.summary || '');
+
+  // Handle experiences dynamically
+  const experiencesHTML = (data.experiences || []).map(exp => `
+    <div class="exp">
+      <div class="exp-title">
+        ${exp.position || ''} | ${exp.company || ''}
+        <span class="exp-date">${exp.startDate || ''} - ${exp.endDate || 'Present'}</span>
+      </div>
+      <ul>
+        ${(exp.responsibilities || []).map(r => `<li>${r}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+
+  html = html.replace('{{experiences}}', experiencesHTML);
+
+  // Handle education dynamically
+  const educationHTML = (data.education || []).map(edu => `
+    <div class="edu">
+      <b>${edu.degree || ''}</b> in ${edu.field || ''} — ${edu.institution || ''}
+      (${edu.graduationYear || ''}) ${edu.gpa ? `• GPA: ${edu.gpa}` : ''}
+    </div>
+  `).join('');
+
+  html = html.replace('{{education}}', educationHTML);
+
+  // Handle skills
+  const skills = data.skills || {};
+  html = html.replace('{{skills}}', `
+    <p><strong>Technical:</strong> ${skills.technical || ''}</p>
+    <p><strong>Soft:</strong> ${skills.soft || ''}</p>
+    <p><strong>Languages:</strong> ${skills.languages || ''}</p>
+  `);
+
+  // Launch headless Chrome and render the PDF
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: 'networkidle0' });
+
+  const pdfBuffer = await page.pdf({
+    format: 'A4',
+    printBackground: true,
+    margin: { top: '1in', bottom: '1in', left: '0.8in', right: '0.8in' }
+  });
+
+  await browser.close();
+
+  // Send PDF to client
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
+
+module.exports = { renderResumeHTMLToPDF };

@@ -1,0 +1,1 @@
+{"error":"Route not found","availableRoutes":["GET /api/health","POST /api/analyze/file","POST /api/analyze/file-robust","POST /api/analyze/linkedin","POST /api/auth/login","POST /api/auth/signup","POST /api/generate/resume","POST /api/generate/resume-optimized","POST /api/admin/migrate-users"]}

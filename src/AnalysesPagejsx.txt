@@ -1,0 +1,321 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import './AnalysesPage.css';
+import {
+  HiOutlineDocumentText,
+  HiOutlineCalendar,
+  HiOutlineChartBar,
+  HiOutlineDownload,
+  HiOutlineTrash,
+  HiOutlineEye,
+  HiOutlineArrowLeft,
+  HiOutlineSearch,
+  HiOutlineFilter,
+  HiOutlineTrendingUp
+} from 'react-icons/hi';
+
+export default function AnalysesPage() {
+  const navigate = useNavigate();
+  const [analyses, setAnalyses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all, high, medium, low
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('date'); // date, score, name
+
+  useEffect(() => {
+    fetchAnalyses();
+  }, []);
+
+  const fetchAnalyses = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!user.id) {
+        console.log('No user found, using mock data');
+        setAnalyses(getMockAnalyses());
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5050/api/user/analyses/${user.id}`);
+      const data = await response.json();
+
+      if (data.success && data.analyses) {
+        setAnalyses(data.analyses);
+      } else {
+        // Fallback to mock data
+        setAnalyses(getMockAnalyses());
+      }
+    } catch (error) {
+      console.error('Error fetching analyses:', error);
+      setAnalyses(getMockAnalyses());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMockAnalyses = () => [
+    {
+      _id: '1',
+      fileName: 'John_Doe_Resume.pdf',
+      createdAt: new Date().toISOString(),
+      results: {
+        score: 85,
+        atsCompatibility: 'High',
+        overallRating: 'Excellent',
+        strengths: ['Strong experience section', 'Clear formatting', 'Good keywords'],
+        improvements: ['Add more metrics', 'Expand skills section']
+      }
+    },
+    {
+      _id: '2',
+      fileName: 'Software_Engineer_Resume.docx',
+      createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+      results: {
+        score: 72,
+        atsCompatibility: 'Medium',
+        overallRating: 'Good',
+        strengths: ['Technical skills highlighted', 'Project experience'],
+        improvements: ['Improve formatting', 'Add contact details', 'Quantify achievements']
+      }
+    },
+    {
+      _id: '3',
+      fileName: 'Marketing_Manager_Resume.pdf',
+      createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+      results: {
+        score: 90,
+        atsCompatibility: 'High',
+        overallRating: 'Outstanding',
+        strengths: ['Quantified results', 'Leadership experience', 'Clear structure'],
+        improvements: ['Minor formatting tweaks']
+      }
+    },
+    {
+      _id: '4',
+      fileName: 'Data_Analyst_Resume.pdf',
+      createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
+      results: {
+        score: 68,
+        atsCompatibility: 'Medium',
+        overallRating: 'Fair',
+        strengths: ['Technical tools listed', 'Education section'],
+        improvements: ['Add more detail', 'Improve summary', 'Better formatting']
+      }
+    }
+  ];
+
+  const getScoreColor = (score) => {
+    if (score >= 80) return '#10B981'; // Green
+    if (score >= 60) return '#F59E0B'; // Orange
+    return '#EF4444'; // Red
+  };
+
+  const getATSBadgeClass = (ats) => {
+    if (ats === 'High') return 'ats-badge high';
+    if (ats === 'Medium') return 'ats-badge medium';
+    return 'ats-badge low';
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const filteredAnalyses = analyses
+    .filter(analysis => {
+      // Filter by ATS score
+      if (filter === 'high' && analysis.results.atsCompatibility !== 'High') return false;
+      if (filter === 'medium' && analysis.results.atsCompatibility !== 'Medium') return false;
+      if (filter === 'low' && analysis.results.atsCompatibility === 'High') return false;
+      
+      // Search filter
+      if (searchTerm && !analysis.fileName.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'score') {
+        return b.results.score - a.results.score;
+      }
+      if (sortBy === 'name') {
+        return a.fileName.localeCompare(b.fileName);
+      }
+      // Default: sort by date
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+  const avgScore = analyses.length > 0
+    ? Math.round(analyses.reduce((sum, a) => sum + a.results.score, 0) / analyses.length)
+    : 0;
+
+  const highScoreCount = analyses.filter(a => a.results.score >= 80).length;
+
+  return (
+    <div className="analyses-page">
+      {/* Header */}
+      <div className="analyses-header">
+        <button onClick={() => navigate('/dashboard')} className="back-button">
+          <HiOutlineArrowLeft />
+          <span>Back to Dashboard</span>
+        </button>
+        <h1>My Analyses</h1>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <HiOutlineDocumentText />
+          </div>
+          <div className="stat-info">
+            <p className="stat-label">Total Analyses</p>
+            <h3 className="stat-value">{analyses.length}</h3>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+            <HiOutlineChartBar />
+          </div>
+          <div className="stat-info">
+            <p className="stat-label">Average Score</p>
+            <h3 className="stat-value">{avgScore}</h3>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+            <HiOutlineTrendingUp />
+          </div>
+          <div className="stat-info">
+            <p className="stat-label">High Scores</p>
+            <h3 className="stat-value">{highScoreCount}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters & Search */}
+      <div className="controls-bar">
+        <div className="search-box">
+          <HiOutlineSearch className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search by filename..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="filter-group">
+          <HiOutlineFilter className="filter-icon" />
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All Analyses</option>
+            <option value="high">High ATS Score</option>
+            <option value="medium">Medium ATS Score</option>
+            <option value="low">Needs Improvement</option>
+          </select>
+
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="date">Sort by Date</option>
+            <option value="score">Sort by Score</option>
+            <option value="name">Sort by Name</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Analyses List */}
+      <div className="analyses-list">
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Loading your analyses...</p>
+          </div>
+        ) : filteredAnalyses.length === 0 ? (
+          <div className="empty-state">
+            <HiOutlineDocumentText className="empty-icon" />
+            <h3>No analyses found</h3>
+            <p>Upload a resume to get started with AI analysis</p>
+            <button onClick={() => navigate('/upload')} className="btn-primary">
+              Upload Resume
+            </button>
+          </div>
+        ) : (
+          filteredAnalyses.map((analysis) => (
+            <div key={analysis._id} className="analysis-card">
+              <div className="analysis-header">
+                <div className="analysis-title">
+                  <HiOutlineDocumentText className="doc-icon" />
+                  <div>
+                    <h3>{analysis.fileName}</h3>
+                    <p className="analysis-date">
+                      <HiOutlineCalendar />
+                      {formatDate(analysis.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="analysis-score-badge" style={{ background: getScoreColor(analysis.results.score) }}>
+                  {analysis.results.score}
+                </div>
+              </div>
+
+              <div className="analysis-body">
+                <div className="analysis-meta">
+                  <span className={getATSBadgeClass(analysis.results.atsCompatibility)}>
+                    {analysis.results.atsCompatibility} ATS
+                  </span>
+                  <span className="rating-badge">{analysis.results.overallRating}</span>
+                </div>
+
+                <div className="analysis-details">
+                  <div className="detail-section">
+                    <h4>✅ Strengths</h4>
+                    <ul>
+                      {analysis.results.strengths?.slice(0, 2).map((strength, idx) => (
+                        <li key={idx}>{strength}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="detail-section">
+                    <h4>🔧 Improvements</h4>
+                    <ul>
+                      {analysis.results.improvements?.slice(0, 2).map((improvement, idx) => (
+                        <li key={idx}>{improvement}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="analysis-actions">
+                <button className="action-btn view">
+                  <HiOutlineEye />
+                  View Details
+                </button>
+                <button className="action-btn download">
+                  <HiOutlineDownload />
+                  Download
+                </button>
+                <button className="action-btn delete">
+                  <HiOutlineTrash />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

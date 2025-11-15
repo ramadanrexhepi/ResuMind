@@ -1,0 +1,433 @@
+/* Upload Page */
+.upload-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-2) 100%);
+  font-family: 'Inter', sans-serif;
+  padding: 40px 24px;
+}
+
+.top-buttons {
+  position: fixed;        /* keeps both visible on scroll */
+  top: 20px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between; /* pushes one left, one right */
+  align-items: center;
+  padding: 0 40px;
+  z-index: 1000;
+}
+
+/* shared styling */
+.back-button{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  color: #2563EB;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.back-button:hover,
+.dashboard:hover {
+  color: #4a83ff;
+}
+
+
+/* Upload Container */
+.upload-container {
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.upload-title {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.upload-subtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 48px;
+}
+
+/* Upload Method Toggle */
+.upload-toggle {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 48px;
+}
+
+.upload-toggle button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #2563EB;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-toggle button.active {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+}
+
+.upload-toggle button:hover:not(.active) {
+  border-color: #2563EB;
+  color: #2563EB;
+}
+
+/* Drop Zone */
+.drop-zone {
+  background: #FFFFFF;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 80px 40px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.drop-zone:hover {
+  border-color: #2563EB;
+  background: var(--muted-bg);
+}
+
+.drop-zone.drag-active {
+  border-color: #2563EB;
+  background: #EFF6FF;
+  transform: scale(1.02);
+}
+
+/* Upload Icon */
+.upload-icon-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.upload-icon-circle {
+  width: 80px;
+  height: 80px;
+  background: #EFF6FF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-icon {
+  width: 36px;
+  height: 36px;
+  color: #2563EB;
+}
+
+/* Drop Text */
+.drop-text {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.drop-subtext {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+/* Choose File Button */
+.choose-file-btn {
+  padding: 12px 32px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.choose-file-btn:hover {
+  background: #1D4ED8;
+}
+
+/* LinkedIn Section */
+.linkedin-section {
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 60px 40px;
+}
+
+.linkedin-icon-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.linkedin-icon {
+  width: 64px;
+  height: 64px;
+  color: #0A66C2;
+}
+
+.linkedin-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.linkedin-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+.linkedin-input-wrapper {
+  margin-bottom: 16px;
+}
+
+.linkedin-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 16px;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.linkedin-input:focus {
+  outline: none;
+  border-color: #0A66C2;
+  box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.1);
+}
+
+.linkedin-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.linkedin-help {
+  font-size: 14px;
+  color: #6B7280;
+  text-align: left;
+}
+
+/* Action Section */
+.action-section {
+  margin-top: 32px;
+  padding: 24px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* File Info Compact */
+.file-info-compact {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--muted-bg);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.file-icon {
+  font-size: 32px;
+}
+
+.file-details {
+  flex: 1;
+  text-align: left;
+}
+
+.file-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.file-size {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* LinkedIn Info Compact */
+.linkedin-info-compact {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #EFF6FF;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.linkedin-icon-small {
+  width: 32px;
+  height: 32px;
+  color: #0A66C2;
+  flex-shrink: 0;
+}
+
+.linkedin-details {
+  flex: 1;
+  text-align: left;
+}
+
+.linkedin-url-display {
+  font-size: 14px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+/* Remove Button */
+.remove-btn {
+  width: 32px;
+  height: 32px;
+  background: #FEE2E2;
+  color: #991B1B;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.remove-btn:hover {
+  background: #FECACA;
+}
+
+/* Analyze Button */
+.analyze-btn {
+  width: 100%;
+  padding: 14px 32px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.analyze-btn:hover {
+  background: #1D4ED8;
+}
+
+/* Responsive - Tablet */
+@media (max-width: 768px) {
+  .upload-title {
+    font-size: 36px;
+  }
+
+  .upload-subtitle {
+    font-size: 16px;
+    margin-bottom: 40px;
+  }
+
+  .upload-toggle {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .upload-toggle button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .drop-zone {
+    padding: 60px 24px;
+  }
+
+  .linkedin-section {
+    padding: 48px 24px;
+  }
+
+  .drop-text {
+    font-size: 16px;
+  }
+}
+
+/* Responsive - Mobile */
+@media (max-width: 480px) {
+  .upload-page {
+    padding: 24px 16px;
+  }
+
+  .back-button {
+    margin-bottom: 40px;
+  }
+
+  .upload-title {
+    font-size: 28px;
+  }
+
+  .upload-subtitle {
+    font-size: 15px;
+  }
+
+  .drop-zone {
+    padding: 48px 20px;
+  }
+
+  .linkedin-section {
+    padding: 40px 20px;
+  }
+
+  .upload-icon-circle {
+    width: 64px;
+    height: 64px;
+  }
+
+  .upload-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .linkedin-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .drop-text {
+    font-size: 15px;
+  }
+
+  .choose-file-btn {
+    padding: 10px 24px;
+    font-size: 15px;
+  }
+
+  .file-info-compact,
+  .linkedin-info-compact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .remove-btn {
+    align-self: flex-end;
+  }
+}

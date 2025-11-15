@@ -1,0 +1,241 @@
+const PDFDocument = require('pdfkit');
+
+/** Sanitize unsafe characters */
+function sanitize(text) {
+  return String(text || '').replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\uFFFF]/g, '');
+}
+
+/** --- HEADER --- */
+function drawHeader(doc, basics) {
+  const name = sanitize(basics?.name || 'Candidate Name');
+  const contacts = [
+    sanitize(basics?.email),
+    sanitize(basics?.phone),
+    sanitize(basics?.location),
+    basics?.linkedin && `LinkedIn: ${sanitize(basics.linkedin)}`,
+    basics?.portfolio && `Portfolio: ${sanitize(basics.portfolio)}`
+  ].filter(Boolean);
+
+  doc.font('Helvetica-Bold')
+    .fontSize(26)
+    .fillColor('#111827')
+    .text(name, { align: 'center' })
+    .moveDown(0.3)
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor('#6b7280')
+    .text(contacts.join('  |  '), { align: 'center' })
+    .moveDown(0.6);
+
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).lineWidth(1).stroke('#d1d5db');
+  doc.moveDown(0.4);
+}
+
+/** --- SECTION TITLE --- */
+function section(doc, title) {
+  doc.moveDown(0.8);
+  doc.font('Helvetica-Bold').fontSize(13).fillColor('#2563eb').text(sanitize(title));
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  doc.moveTo(left, doc.y + 2).lineTo(right, doc.y + 2).lineWidth(0.5).stroke('#e5e7eb');
+  doc.moveDown(0.4);
+  doc.font('Helvetica').fontSize(10).fillColor('#111827');
+}
+
+/** --- PARAGRAPH --- */
+function drawParagraph(doc, text) {
+  if (!text) return;
+  sanitize(text).split(/\r?\n/).forEach(line => {
+    doc.text(line.trim(), { paragraphGap: 3 });
+  });
+  doc.moveDown(0.2);
+}
+
+/** --- BULLET LIST --- */
+function drawBullets(doc, items) {
+  if (!items) return;
+  const list = Array.isArray(items)
+    ? items
+    : String(items).split(/\r?\n/).filter(Boolean);
+
+  const indent = 14;
+  const width = (doc.page.width - doc.page.margins.right) - (doc.x + indent);
+
+  for (const raw of list) {
+    const text = sanitize(raw);
+    if (!text) continue;
+
+    const cx = doc.x + 3;
+    const cy = doc.y + 5;
+
+    doc.save().circle(cx, cy, 1.5).fillAndStroke('#2563eb', '#2563eb').restore();
+    doc.fillColor('#111827').text(text, doc.x + indent, doc.y - 4, {
+      width,
+      lineGap: 1
+    });
+    doc.moveDown(0.2);
+  }
+}
+
+/** --- EXPERIENCE SECTION --- */
+function drawExperience(doc, experiences) {
+  if (!Array.isArray(experiences)) return;
+  const right = doc.page.width - doc.page.margins.right;
+
+  experiences.forEach(exp => {
+    const position = sanitize(exp?.position);
+    const company = sanitize(exp?.company);
+    const heading = [position, company].filter(Boolean).join(' | ') || 'Experience';
+    const start = sanitize(exp?.startDate);
+    const end = sanitize(exp?.endDate || (exp?.currentlyWorking ? 'Present' : ''));
+    const dates = [start, end].filter(Boolean).join(' – ');
+
+    const yStart = doc.y;
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827')
+       .text(heading, { width: right - doc.page.margins.left - 140 });
+
+    if (dates) {
+      const w = doc.widthOfString(dates);
+      doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
+         .text(dates, right - w, yStart);
+    }
+
+    if (exp?.summary) drawParagraph(doc, exp.summary);
+
+    const bullets = [];
+    if (exp?.responsibilities)
+      bullets.push(...(Array.isArray(exp.responsibilities)
+        ? exp.responsibilities
+        : String(exp.responsibilities).split(/\r?\n/).filter(Boolean)));
+    if (exp?.achievements)
+      bullets.push(...(Array.isArray(exp.achievements)
+        ? exp.achievements
+        : String(exp.achievements).split(/\r?\n/).filter(Boolean)));
+
+    drawBullets(doc, bullets);
+    doc.moveDown(0.3);
+  });
+}
+
+/** --- EDUCATION --- */
+function drawEducation(doc, education) {
+  if (!Array.isArray(education)) return;
+  education.forEach(edu => {
+    const degree = sanitize(edu?.degree);
+    const field = sanitize(edu?.field);
+    const institution = sanitize(edu?.institution);
+    const heading = [degree && `${degree}${field ? ` in ${field}` : ''}`, institution]
+      .filter(Boolean)
+      .join(' | ');
+
+    const gy = sanitize(edu?.graduationYear);
+    const gpa = sanitize(edu?.gpa);
+    const details = [gy && `Graduated: ${gy}`, gpa && `GPA: ${gpa}`].filter(Boolean).join(' • ');
+
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text(heading);
+    if (details) {
+      doc.font('Helvetica').fontSize(9).fillColor('#6b7280').text(details);
+    }
+    doc.moveDown(0.4);
+  });
+}
+
+/** --- SKILLS --- */
+function drawSkills(doc, skills) {
+  if (!skills) return;
+  const parts = [];
+  if (skills.technical) parts.push(`Technical: ${sanitize(skills.technical)}`);
+  if (skills.soft) parts.push(`Soft: ${sanitize(skills.soft)}`);
+  if (skills.languages) parts.push(`Languages: ${sanitize(skills.languages)}`);
+  drawParagraph(doc, parts.join('\n'));
+}
+
+/** --- NORMALIZATION --- */
+function normalizeData(input = {}) {
+  const basics = {
+    name: input.fullName || input.name || 'Candidate Name',
+    email: input.email,
+    phone: input.phone,
+    location: input.location,
+    linkedin: input.linkedinUrl || input.linkedin,
+    portfolio: input.portfolioUrl || input.portfolio
+  };
+
+  const summary = input.summary || input.professionalSummary || '';
+  const experiences = Array.isArray(input.experiences) ? input.experiences : [];
+  const education = Array.isArray(input.education) ? input.education : [];
+  const skills = {
+    technical: input.technicalSkills || input.keySkills,
+    soft: input.softSkills,
+    languages: input.languages
+  };
+
+  return { basics, summary, experiences, education, skills };
+}
+
+/** --- MAIN PDF RENDERER --- */
+function renderResumePDF(res, data, filename = 'resume.pdf') {
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 50, bottom: 50, left: 50, right: 50 }
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  doc.pipe(res);
+
+  const normalized = normalizeData(data);
+  drawHeader(doc, normalized.basics);
+
+  if (normalized.summary) {
+    section(doc, 'Professional Summary');
+    drawParagraph(doc, normalized.summary);
+  }
+
+  if (normalized.experiences?.length) {
+    section(doc, 'Experience');
+    drawExperience(doc, normalized.experiences);
+  }
+
+  if (normalized.education?.length) {
+    section(doc, 'Education');
+    drawEducation(doc, normalized.education);
+  }
+
+  if (normalized.skills && (normalized.skills.technical || normalized.skills.soft || normalized.skills.languages)) {
+    section(doc, 'Skills');
+    drawSkills(doc, normalized.skills);
+  }
+
+  doc.moveDown(1);
+  doc.font('Helvetica-Oblique').fontSize(8).fillColor('#9ca3af')
+     .text('Generated by ResuMind', { align: 'center' });
+
+  doc.end();
+}
+
+/** --- FALLBACK TEXT RENDERER --- */
+function renderPlainTextPDF(res, title, bodyText, filename = 'resume.pdf') {
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 50, bottom: 50, left: 50, right: 50 }
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  doc.pipe(res);
+
+  doc.font('Helvetica-Bold').fontSize(16).text(sanitize(title))
+     .moveDown(0.5)
+     .font('Helvetica').fontSize(10).fillColor('#111827');
+  sanitize(bodyText).split(/\r?\n/).forEach(line => doc.text(line, { paragraphGap: 2 }));
+
+  doc.moveDown(1);
+  doc.font('Helvetica-Oblique').fontSize(8).fillColor('#9ca3af')
+     .text('Generated by ResuMind', { align: 'center' });
+  doc.end();
+}
+
+module.exports = { renderResumePDF, renderPlainTextPDF };

@@ -1,0 +1,534 @@
+const PDFDocument = require('pdfkit');
+
+/** Sanitize unsafe characters */
+function sanitize(text) {
+  return String(text || '').replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\uFFFF]/g, '');
+}
+
+/** Modern Color Palette */
+const COLORS = {
+  primary: '#0f172a',      // Slate 900 - main text
+  secondary: '#475569',    // Slate 600 - secondary text
+  accent: '#3b82f6',       // Blue 500 - accent color
+  accentLight: '#60a5fa', // Blue 400 - lighter accent
+  muted: '#94a3b8',        // Slate 400 - muted text
+  divider: '#e2e8f0',      // Slate 200 - dividers
+  background: '#f8fafc'    // Slate 50 - subtle backgrounds
+};
+
+/** --- MODERN HEADER WITH ACCENT BAR --- */
+function drawHeader(doc, basics) {
+  // Accent bar at the top
+  doc.rect(0, 0, doc.page.width, 8)
+     .fill(COLORS.accent);
+  
+  doc.moveDown(1.5);
+  
+  const name = sanitize(basics?.name || 'Candidate Name');
+  const title = sanitize(basics?.title || '');
+  
+  // Name - large and bold
+  doc.font('Helvetica-Bold')
+     .fontSize(32)
+     .fillColor(COLORS.primary)
+     .text(name, { align: 'center' });
+  
+  // Professional title if available
+  if (title) {
+    doc.moveDown(0.2)
+       .font('Helvetica')
+       .fontSize(14)
+       .fillColor(COLORS.accent)
+       .text(title, { align: 'center' });
+  }
+  
+  doc.moveDown(0.5);
+  
+  // Contact info with icons
+  const contacts = [
+    basics?.email && `✉ ${sanitize(basics.email)}`,
+    basics?.phone && `☎ ${sanitize(basics.phone)}`,
+    basics?.location && `⌖ ${sanitize(basics.location)}`
+  ].filter(Boolean);
+  
+  if (contacts.length) {
+    doc.font('Helvetica')
+       .fontSize(10)
+       .fillColor(COLORS.secondary)
+       .text(contacts.join('    '), { align: 'center' });
+  }
+  
+  // Links on separate line if present
+  const links = [
+    basics?.linkedin && `🔗 ${sanitize(basics.linkedin)}`,
+    basics?.portfolio && `🌐 ${sanitize(basics.portfolio)}`,
+    basics?.github && `💻 ${sanitize(basics.github)}`
+  ].filter(Boolean);
+  
+  if (links.length) {
+    doc.moveDown(0.2)
+       .fontSize(9)
+       .fillColor(COLORS.accent)
+       .text(links.join('    '), { align: 'center' });
+  }
+  
+  doc.moveDown(1.2);
+}
+
+/** --- MODERN SECTION TITLE WITH ACCENT --- */
+function section(doc, title, icon = '') {
+  doc.moveDown(0.6);
+  
+  const left = doc.page.margins.left;
+  const y = doc.y;
+  
+  // Left accent bar
+  doc.rect(left - 20, y - 2, 3, 18)
+     .fill(COLORS.accent);
+  
+  // Section title
+  doc.font('Helvetica-Bold')
+     .fontSize(14)
+     .fillColor(COLORS.primary)
+     .text(`${icon} ${sanitize(title)}`.trim().toUpperCase(), left, y, {
+       characterSpacing: 0.5
+     });
+  
+  doc.moveDown(0.5);
+  doc.font('Helvetica').fontSize(10).fillColor(COLORS.primary);
+}
+
+/** --- STYLED PARAGRAPH --- */
+function drawParagraph(doc, text, options = {}) {
+  if (!text) return;
+  
+  const color = options.color || COLORS.primary;
+  const fontSize = options.fontSize || 10;
+  const lineGap = options.lineGap || 2;
+  
+  doc.fillColor(color).fontSize(fontSize);
+  
+  sanitize(text).split(/\r?\n/).forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed) {
+      doc.text(trimmed, {
+        align: options.align || 'left',
+        lineGap: lineGap,
+        paragraphGap: 4
+      });
+    }
+  });
+  
+  doc.moveDown(0.3);
+}
+
+/** --- MODERN BULLET LIST --- */
+function drawBullets(doc, items, options = {}) {
+  if (!items) return;
+  
+  const list = Array.isArray(items)
+    ? items
+    : String(items).split(/\r?\n/).filter(Boolean);
+  
+  if (list.length === 0) return;
+  
+  const indent = options.indent || 18;
+  const bulletStyle = options.bulletStyle || 'circle'; // 'circle', 'square', 'arrow'
+  const width = (doc.page.width - doc.page.margins.right) - (doc.x + indent);
+  
+  list.forEach(raw => {
+    const text = sanitize(raw).trim();
+    if (!text) return;
+    
+    const startX = doc.x;
+    const startY = doc.y;
+    
+    // Draw bullet based on style
+    if (bulletStyle === 'circle') {
+      doc.save()
+         .circle(startX + 5, startY + 5, 2)
+         .fillAndStroke(COLORS.accent, COLORS.accent)
+         .restore();
+    } else if (bulletStyle === 'square') {
+      doc.save()
+         .rect(startX + 3, startY + 3, 4, 4)
+         .fillAndStroke(COLORS.accent, COLORS.accent)
+         .restore();
+    } else if (bulletStyle === 'arrow') {
+      doc.save()
+         .fontSize(10)
+         .fillColor(COLORS.accent)
+         .text('▸', startX, startY)
+         .restore();
+    }
+    
+    // Draw text
+    doc.fillColor(COLORS.primary)
+       .fontSize(10)
+       .text(text, startX + indent, startY, {
+         width,
+         lineGap: 2,
+         paragraphGap: 0
+       });
+    
+    doc.moveDown(0.25);
+  });
+}
+
+/** --- EXPERIENCE SECTION WITH MODERN LAYOUT --- */
+function drawExperience(doc, experiences) {
+  if (!Array.isArray(experiences) || experiences.length === 0) return;
+  
+  const right = doc.page.width - doc.page.margins.right;
+  const left = doc.page.margins.left;
+  
+  experiences.forEach((exp, index) => {
+    if (index > 0) doc.moveDown(0.4);
+    
+    const position = sanitize(exp?.position || 'Position');
+    const company = sanitize(exp?.company || 'Company');
+    const location = sanitize(exp?.location || '');
+    const start = sanitize(exp?.startDate || '');
+    const end = sanitize(exp?.endDate || (exp?.currentlyWorking ? 'Present' : ''));
+    
+    const yStart = doc.y;
+    
+    // Position title - bold and prominent
+    doc.font('Helvetica-Bold')
+       .fontSize(12)
+       .fillColor(COLORS.primary)
+       .text(position, left, yStart);
+    
+    const posHeight = doc.y - yStart;
+    
+    // Date range - right aligned
+    const dateStr = [start, end].filter(Boolean).join(' – ');
+    if (dateStr) {
+      const dateWidth = doc.widthOfString(dateStr);
+      doc.font('Helvetica')
+         .fontSize(9)
+         .fillColor(COLORS.muted)
+         .text(dateStr, right - dateWidth, yStart + 2);
+    }
+    
+    doc.y = yStart + posHeight;
+    
+    // Company and location
+    const companyLine = [company, location].filter(Boolean).join(' • ');
+    doc.font('Helvetica')
+       .fontSize(10)
+       .fillColor(COLORS.accent)
+       .text(companyLine, left, doc.y);
+    
+    doc.moveDown(0.3);
+    
+    // Summary paragraph
+    if (exp?.summary) {
+      drawParagraph(doc, exp.summary, { color: COLORS.secondary, lineGap: 3 });
+    }
+    
+    // Responsibilities and achievements
+    const bullets = [];
+    if (exp?.responsibilities) {
+      bullets.push(...(Array.isArray(exp.responsibilities)
+        ? exp.responsibilities
+        : String(exp.responsibilities).split(/\r?\n/).filter(Boolean)));
+    }
+    if (exp?.achievements) {
+      bullets.push(...(Array.isArray(exp.achievements)
+        ? exp.achievements
+        : String(exp.achievements).split(/\r?\n/).filter(Boolean)));
+    }
+    
+    if (bullets.length > 0) {
+      drawBullets(doc, bullets, { bulletStyle: 'circle' });
+    }
+  });
+}
+
+/** --- EDUCATION WITH MODERN STYLING --- */
+function drawEducation(doc, education) {
+  if (!Array.isArray(education) || education.length === 0) return;
+  
+  const right = doc.page.width - doc.page.margins.right;
+  const left = doc.page.margins.left;
+  
+  education.forEach((edu, index) => {
+    if (index > 0) doc.moveDown(0.4);
+    
+    const degree = sanitize(edu?.degree || '');
+    const field = sanitize(edu?.field || '');
+    const institution = sanitize(edu?.institution || 'Institution');
+    const year = sanitize(edu?.graduationYear || '');
+    const gpa = sanitize(edu?.gpa || '');
+    const location = sanitize(edu?.location || '');
+    
+    const yStart = doc.y;
+    
+    // Degree and field
+    const degreeText = degree && field 
+      ? `${degree} in ${field}` 
+      : degree || field || 'Degree';
+    
+    doc.font('Helvetica-Bold')
+       .fontSize(12)
+       .fillColor(COLORS.primary)
+       .text(degreeText, left, yStart);
+    
+    // Year - right aligned
+    if (year) {
+      const yearWidth = doc.widthOfString(year);
+      doc.font('Helvetica')
+         .fontSize(9)
+         .fillColor(COLORS.muted)
+         .text(year, right - yearWidth, yStart + 2);
+    }
+    
+    // Institution and location
+    const instLine = [institution, location].filter(Boolean).join(' • ');
+    doc.font('Helvetica')
+       .fontSize(10)
+       .fillColor(COLORS.accent)
+       .text(instLine, left, doc.y);
+    
+    // GPA or honors
+    if (gpa || edu?.honors) {
+      doc.moveDown(0.1);
+      const details = [gpa && `GPA: ${gpa}`, edu?.honors].filter(Boolean).join(' • ');
+      doc.font('Helvetica')
+         .fontSize(9)
+         .fillColor(COLORS.secondary)
+         .text(details, left, doc.y);
+    }
+  });
+}
+
+/** --- SKILLS WITH TAG-STYLE LAYOUT --- */
+function drawSkills(doc, skills) {
+  if (!skills) return;
+  
+  const categories = [];
+  if (skills.technical) categories.push({ label: 'Technical', items: skills.technical });
+  if (skills.soft) categories.push({ label: 'Soft Skills', items: skills.soft });
+  if (skills.languages) categories.push({ label: 'Languages', items: skills.languages });
+  if (skills.tools) categories.push({ label: 'Tools', items: skills.tools });
+  if (skills.frameworks) categories.push({ label: 'Frameworks', items: skills.frameworks });
+  
+  categories.forEach(cat => {
+    doc.font('Helvetica-Bold')
+       .fontSize(10)
+       .fillColor(COLORS.secondary)
+       .text(`${cat.label}:`, { continued: true })
+       .font('Helvetica')
+       .fillColor(COLORS.primary)
+       .text(` ${sanitize(cat.items)}`);
+    doc.moveDown(0.2);
+  });
+}
+
+/** --- PROJECTS SECTION --- */
+function drawProjects(doc, projects) {
+  if (!Array.isArray(projects) || projects.length === 0) return;
+  
+  projects.forEach((proj, index) => {
+    if (index > 0) doc.moveDown(0.4);
+    
+    const name = sanitize(proj?.name || 'Project');
+    const role = sanitize(proj?.role || '');
+    const tech = sanitize(proj?.technologies || '');
+    
+    // Project name and role
+    doc.font('Helvetica-Bold')
+       .fontSize(11)
+       .fillColor(COLORS.primary)
+       .text(role ? `${name} - ${role}` : name);
+    
+    // Technologies
+    if (tech) {
+      doc.font('Helvetica')
+         .fontSize(9)
+         .fillColor(COLORS.accent)
+         .text(`Tech: ${tech}`);
+    }
+    
+    doc.moveDown(0.2);
+    
+    // Description
+    if (proj?.description) {
+      drawParagraph(doc, proj.description, { color: COLORS.secondary, fontSize: 9 });
+    }
+    
+    // Key points
+    if (proj?.highlights) {
+      const highlights = Array.isArray(proj.highlights) 
+        ? proj.highlights 
+        : String(proj.highlights).split(/\r?\n/).filter(Boolean);
+      drawBullets(doc, highlights, { bulletStyle: 'arrow', indent: 15 });
+    }
+  });
+}
+
+/** --- CERTIFICATIONS --- */
+function drawCertifications(doc, certifications) {
+  if (!Array.isArray(certifications) || certifications.length === 0) return;
+  
+  certifications.forEach((cert, index) => {
+    if (index > 0) doc.moveDown(0.2);
+    
+    const name = sanitize(cert?.name || 'Certification');
+    const issuer = sanitize(cert?.issuer || '');
+    const date = sanitize(cert?.date || '');
+    
+    const line = [name, issuer, date].filter(Boolean).join(' • ');
+    
+    doc.font('Helvetica')
+       .fontSize(10)
+       .fillColor(COLORS.primary)
+       .text(line);
+  });
+}
+
+/** --- DATA NORMALIZATION --- */
+function normalizeData(input = {}) {
+  return {
+    basics: {
+      name: input.fullName || input.name || 'Candidate Name',
+      title: input.title || input.jobTitle || '',
+      email: input.email || '',
+      phone: input.phone || '',
+      location: input.location || input.address || '',
+      linkedin: input.linkedinUrl || input.linkedin || '',
+      portfolio: input.portfolioUrl || input.portfolio || '',
+      github: input.githubUrl || input.github || ''
+    },
+    summary: input.summary || input.professionalSummary || '',
+    experiences: Array.isArray(input.experiences) ? input.experiences : [],
+    education: Array.isArray(input.education) ? input.education : [],
+    skills: {
+      technical: input.technicalSkills || input.skills?.technical || '',
+      soft: input.softSkills || input.skills?.soft || '',
+      languages: input.languages || input.skills?.languages || '',
+      tools: input.tools || input.skills?.tools || '',
+      frameworks: input.frameworks || input.skills?.frameworks || ''
+    },
+    projects: Array.isArray(input.projects) ? input.projects : [],
+    certifications: Array.isArray(input.certifications) ? input.certifications : []
+  };
+}
+
+/** --- MAIN MODERN PDF RENDERER --- */
+function renderResumePDF(res, data, filename = 'resume.pdf') {
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 40, bottom: 50, left: 60, right: 60 }
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  doc.pipe(res);
+
+  const normalized = normalizeData(data);
+  
+  // Header
+  drawHeader(doc, normalized.basics);
+
+  // Professional Summary
+  if (normalized.summary) {
+    section(doc, 'Professional Summary', '📋');
+    drawParagraph(doc, normalized.summary, { 
+      color: COLORS.secondary, 
+      lineGap: 3 
+    });
+  }
+
+  // Experience
+  if (normalized.experiences?.length) {
+    section(doc, 'Professional Experience', '💼');
+    drawExperience(doc, normalized.experiences);
+  }
+
+  // Projects (if any)
+  if (normalized.projects?.length) {
+    section(doc, 'Projects', '🚀');
+    drawProjects(doc, normalized.projects);
+  }
+
+  // Education
+  if (normalized.education?.length) {
+    section(doc, 'Education', '🎓');
+    drawEducation(doc, normalized.education);
+  }
+
+  // Skills
+  if (normalized.skills && Object.values(normalized.skills).some(Boolean)) {
+    section(doc, 'Skills & Expertise', '⚡');
+    drawSkills(doc, normalized.skills);
+  }
+
+  // Certifications (if any)
+  if (normalized.certifications?.length) {
+    section(doc, 'Certifications', '🏆');
+    drawCertifications(doc, normalized.certifications);
+  }
+
+  // Footer
+  doc.moveDown(2);
+  const footerY = doc.page.height - doc.page.margins.bottom + 20;
+  doc.font('Helvetica')
+     .fontSize(8)
+     .fillColor(COLORS.muted)
+     .text('Generated by ResuMind', 50, footerY, { 
+       align: 'center',
+       width: doc.page.width - 100
+     });
+
+  doc.end();
+}
+
+/** --- FALLBACK TEXT RENDERER --- */
+function renderPlainTextPDF(res, title, bodyText, filename = 'resume.pdf') {
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 50, bottom: 50, left: 50, right: 50 }
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  doc.pipe(res);
+
+  // Accent bar
+  doc.rect(0, 0, doc.page.width, 8).fill(COLORS.accent);
+  doc.moveDown(2);
+
+  // Title
+  doc.font('Helvetica-Bold')
+     .fontSize(18)
+     .fillColor(COLORS.primary)
+     .text(sanitize(title));
+  
+  doc.moveDown(0.8);
+
+  // Body
+  doc.font('Helvetica')
+     .fontSize(10)
+     .fillColor(COLORS.primary);
+  
+  sanitize(bodyText).split(/\r?\n/).forEach(line => {
+    doc.text(line, { paragraphGap: 3 });
+  });
+
+  // Footer
+  doc.moveDown(2);
+  const footerY = doc.page.height - doc.page.margins.bottom + 20;
+  doc.font('Helvetica')
+     .fontSize(8)
+     .fillColor(COLORS.muted)
+     .text('Generated by ResuMind', 50, footerY, { 
+       align: 'center',
+       width: doc.page.width - 100
+     });
+
+  doc.end();
+}
+
+module.exports = { renderResumePDF, renderPlainTextPDF };

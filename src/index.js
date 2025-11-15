@@ -3,6 +3,16 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { applyTheme } from './theme';
+
+// Apply saved theme as early as possible to avoid flash
+try {
+  const saved = localStorage.getItem('appPreferences');
+  const theme = saved ? JSON.parse(saved).theme || 'light' : 'light';
+  applyTheme(theme);
+} catch (_) {
+  applyTheme('light');
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

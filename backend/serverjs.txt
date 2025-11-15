@@ -1,0 +1,1685 @@
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises; // ✅ Add .promises here
+const fsSync = require('fs'); // ✅ Add this for sync operations
+const OpenAI = require('openai');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const mongoose = require('mongoose');
+
+require('dotenv').config();
+
+console.log('Running backend from:', __filename);
+
+const connectDB = require('./config/database');
+const User = require('./models/User');       
+const Analysis = require('./models/Analysis'); 
+
+const app = express();
+const PORT = process.env.PORT || 5050;
+
+// Connect to MongoDB - Add this line
+connectDB();
+// Report MongoDB connection status clearly in server logs
+try {
+  const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  const mongoose = require('mongoose');
+  console.log(`MongoDB initial status: ${states[mongoose.connection.readyState] || 'unknown'}`);
+  mongoose.connection.on('connected', () => console.log('MongoDB connected'));
+  mongoose.connection.on('error', (err) => console.error('MongoDB connection error:', err.message));
+  mongoose.connection.on('disconnected', () => console.log('MongoDB disconnected'));
+} catch (_) {}
+
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// Middleware
+// CORS: allow common local dev origins + preflight
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
+// Handle preflight for all routes
+app.options('*', cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Create uploads directory if it doesn't exist (absolute path)
+const uploadsDir = path.join(__dirname, 'uploads');
+try {
+  if (!fsSync.existsSync(uploadsDir)) {
+    fsSync.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (e) {
+  console.error('Failed to ensure uploads directory:', uploadsDir, e);
+}
+
+
+
+
+// Startup diagnostics (clean ASCII logs)
+const openAIConfigured = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your-openai-api-key-here');
+console.log(`OpenAI configured: ${openAIConfigured ? 'Yes' : 'No (using mock data)'}`);
+console.log(`Uploads directory ready: ${uploadsDir}`);
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Use absolute uploadsDir to avoid CWD issues
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+// End of route definitions
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      // Some environments report DOCX as generic octet-stream
+      'application/octet-stream'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF and Word documents are allowed.'));
+    }
+  }
+});
+
+// Error handling middleware for multer
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: 'File is too large. Maximum size is 5MB.' 
+      });
+    }
+    return res.status(400).json({ error: err.message });
+  } else if (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  next();
+};
+
+// Routes
+app.post('/api/analyze/file-robust', upload.single('resume'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    console.log('🔥 /api/analyze/file-robust hit');
+    console.log('File received:', req.file?.originalname);
+    console.log('Path:', req.file?.path);
+    console.log('MIME:', req.file?.mimetype);
+
+    // === Extract text ===
+    let resumeText = '';
+    try {
+      const ext = (path.extname(req.file.originalname) || '').toLowerCase();
+
+      if (req.file.mimetype === 'application/pdf' || ext === '.pdf') {
+        const dataBuffer = fsSync.readFileSync(req.file.path);
+        const pdfData = await pdfParse(dataBuffer);
+        resumeText = pdfData.text || '';
+      } else if (
+        req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        req.file.mimetype === 'application/octet-stream' ||
+        ext === '.docx'
+      ) {
+        const result = await mammoth.extractRawText({ path: req.file.path });
+        resumeText = result.value || '';
+      } else {
+        await fs.unlink(req.file.path);
+        return res.status(400).json({ error: 'Unsupported file format. Please upload PDF or DOCX.' });
+      }
+    } catch (e) {
+      console.error('❌ Extraction error:', e);
+      await fs.unlink(req.file.path);
+      return res.status(500).json({ error: 'Failed to read file content' });
+    }
+
+    // === If OpenAI not configured, fallback ===
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      const { renderPlainTextPDF } = require('./utils/resumePdf');
+      const mockText = `
+Mock Resume Analysis
+--------------------
+File: ${req.file.originalname}
+Score: 75
+ATS Compatibility: Medium
+
+Strengths:
+• Clear sections
+• Relevant experience
+
+Improvements:
+• Add quantified achievements
+• Tighten summary
+`;
+      const safeName = req.file.originalname.replace(/[^a-z0-9_\-\.]+/gi, '_');
+      renderPlainTextPDF(res, 'Mock Resume Analysis', mockText, `mock_${safeName}.pdf`);
+      return;
+    }
+
+    // === Ask AI for structured analysis ===
+    console.log('🤖 Sending to OpenAI...');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      console.error('❌ OpenAI request timed out');
+    }, 20000); // 20s timeout
+
+    try {
+      // === Run OpenAI request with manual timeout ===
+  const completion = await Promise.race([
+    openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are an expert resume analyzer. Return ONLY JSON with keys: score, overallRating, strengths[], improvements[], atsCompatibility, atsScore, suggestedKeywords[].'
+        },
+        {
+          role: 'user',
+          content: `Analyze the following resume text and return the requested JSON.\n\nRESUME TEXT:\n${(resumeText || '').slice(0, 12000)}`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 1200
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('OpenAI request timed out')), 20000)
+    )
+  ]);
+
+      clearTimeout(timeout);
+
+      let aiResponse = completion.choices[0].message.content.trim();
+      aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+      let aiAnalysis;
+      try {
+        aiAnalysis = JSON.parse(aiResponse);
+      } catch (e) {
+        const m = aiResponse.match(/\{[\s\S]*\}/);
+        aiAnalysis = m ? JSON.parse(m[0]) : null;
+      }
+
+      if (!aiAnalysis) {
+        return res.status(502).json({ error: 'AI response could not be parsed' });
+      }
+
+      console.log('✅ AI analysis complete.');
+
+      const { renderPlainTextPDF } = require('./utils/resumePdf');
+      const safeName = req.file.originalname.replace(/[^a-z0-9_\-\.]+/gi, '_');
+      const text = `
+Optimized Resume Report
+========================
+File: ${safeName}
+Score: ${aiAnalysis.score || 'N/A'}/100
+Overall Rating: ${aiAnalysis.overallRating || 'N/A'}
+ATS Compatibility: ${aiAnalysis.atsCompatibility || 'N/A'}
+ATS Score: ${aiAnalysis.atsScore || 'N/A'}
+
+Strengths:
+${(aiAnalysis.strengths || []).map(s => `• ${s}`).join('\n')}
+
+Improvements:
+${(aiAnalysis.improvements || []).map(s => `• ${s}`).join('\n')}
+
+Suggested Keywords:
+${(aiAnalysis.suggestedKeywords || []).join(', ') || 'None'}
+
+---
+Generated by ResuMind
+`;
+
+      renderPlainTextPDF(res, 'Optimized Resume Report', text, `analysis_${safeName}.pdf`);
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error('❌ OpenAI or parsing error:', error.message);
+      if (error.name === 'AbortError') {
+        return res.status(504).json({ error: 'OpenAI request timed out' });
+      }
+      return res.status(500).json({ error: 'Failed to analyze with OpenAI', message: error.message });
+    } finally {
+      if (req.file) {
+        fs.unlink(req.file.path).catch(() => {});
+      }
+    }
+  } catch (outerError) {
+    console.error('❌ Analyze file error:', outerError);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Unexpected server error', message: outerError.message });
+    }
+  }
+});
+
+
+
+app.post('/api/analyze/file-robust', upload.single('resume'), async (req, res) => {
+  console.log('🔥 /api/analyze/file-robust hit');
+  res.json({ success: true, message: 'file-robust route working' });
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Backend is running!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Admin: Change user plan
+app.post('/api/admin/change-user-plan', async (req, res) => {
+  try {
+    const { userId, planType } = req.body;
+
+    // Validate plan type
+    if (!['free', 'pro', 'team'].includes(planType)) {
+      return res.status(400).json({ 
+        error: 'Invalid plan type. Must be: free, pro, or team' 
+      });
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Define plan features
+    const planFeatures = {
+      free: {
+        maxUploads: 3,
+        maxGenerations: 1,
+        hasTemplates: false,
+        hasAdvancedAI: false,
+        hasPrioritySupport: false
+      },
+      pro: {
+        maxUploads: 999999,
+        maxGenerations: 999999,
+        hasTemplates: true,
+        hasAdvancedAI: true,
+        hasPrioritySupport: true
+      },
+      team: {
+        maxUploads: 999999,
+        maxGenerations: 999999,
+        hasTemplates: true,
+        hasAdvancedAI: true,
+        hasPrioritySupport: true
+      }
+    };
+
+    // Update user plan
+    const oldPlan = user.plan.type;
+    user.plan.type = planType;
+    user.plan.status = 'active';
+    user.plan.startDate = new Date();
+    user.plan.features = planFeatures[planType];
+
+    await user.save();
+
+    console.log(`✅ Plan changed: ${user.email} - ${oldPlan} → ${planType}`);
+
+    res.json({
+      success: true,
+      message: `Plan changed from ${oldPlan} to ${planType}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan
+      }
+    });
+  } catch (error) {
+    console.error('❌ Plan change error:', error);
+    res.status(500).json({ error: 'Failed to change plan' });
+  }
+});
+
+// Admin: Get user by email
+app.get('/api/admin/user/:email', async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.params.email });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        usage: user.usage,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching user:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// Admin: List all users with their plans
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const users = await User.find({})
+      .select('name email plan.type plan.status usage createdAt')
+      .sort({ createdAt: -1 });   
+
+    res.json({
+      success: true,
+      count: users.length,
+      users: users
+    });
+  } catch (error) {
+    console.error('❌ Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+
+
+
+// Analyze and Optimize Resume
+// Analyze and Optimize Resume
+app.post('/api/analyze/file', upload.single('resume'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    console.log('📄 File received:', req.file.originalname);
+    console.log('📍 File path:', req.file.path);
+
+    // Extract text from resume
+    let resumeText = '';
+    
+    try {
+      if (req.file.mimetype === 'application/pdf') {
+        console.log('📖 Reading PDF file...');
+        const dataBuffer = fsSync.readFileSync(req.file.path);
+        const pdfData = await pdfParse(dataBuffer);
+        resumeText = pdfData.text;
+        console.log('✅ PDF text extracted');
+      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        console.log('📖 Reading DOCX file...');
+        const result = await mammoth.extractRawText({ path: req.file.path });
+        resumeText = result.value;
+        console.log('✅ DOCX text extracted');
+      } else {
+        // Clean up file
+        await fs.unlink(req.file.path);
+        return res.status(400).json({ error: 'Unsupported file format. Please upload PDF or DOCX.' });
+      }
+    } catch (extractError) {
+      console.error('❌ Text extraction error:', extractError);
+      console.error('Error details:', extractError.stack); 
+      // Clean up file
+      await fs.unlink(req.file.path);
+      return res.status(500).json({ error: 'Failed to read file content' });
+    }
+
+    console.log('📝 Extracted text length:', resumeText.length, 'characters');
+
+    if (!resumeText || resumeText.length < 50) {
+      await fs.unlink(req.file.path);
+      return res.status(400).json({ error: 'Could not extract enough text from the file' });
+    }
+
+    // Check if OpenAI is configured
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      console.log('⚠️  OpenAI not configured, returning mock optimization');
+      
+      // Generate mock optimized resume
+      const mockOptimizedResume = generateMockOptimizedResume(resumeText, req.file.originalname);
+      
+      // Clean up uploaded file
+      await fs.unlink(req.file.path);
+      
+      return res.json({
+        success: true,
+        fileName: req.file.originalname,
+        analysis: {
+          score: 85,
+          atsCompatibility: 'High',
+          improvements: [
+            'Added quantifiable achievements',
+            'Improved action verbs',
+            'Added relevant keywords',
+            'Improved formatting',
+            'Enhanced professional summary'
+          ]
+        },
+        optimizedResume: mockOptimizedResume
+      });
+    }
+
+// Use OpenAI to optimize resume
+console.log('🤖 Sending to OpenAI for optimization...');
+
+const completion = await openai.chat.completions.create({
+  model: "gpt-4o-mini",  // ✅ Changed from gpt-4o (faster and cheaper)
+  messages: [
+    {
+      role: "system",
+      content: `You are an expert resume writer. Optimize resumes for ATS systems.
+
+CRITICAL: Keep responses under 1500 characters.
+
+Return ONLY the optimized resume in this format:
+
+[FULL NAME]
+[Email] | [Phone] | [Location]
+
+SUMMARY
+[2 sentences about experience]
+
+EXPERIENCE
+[Job Title] | [Company] | [Dates]
+- [Achievement with numbers]
+- [Achievement with numbers]
+
+EDUCATION
+[Degree] | [School] | [Year]
+
+SKILLS
+[List 5-10 key skills]
+
+Keep it concise and professional.`
+    },
+    {
+      role: "user",
+      content: `Optimize this resume (keep under 1500 chars):\n\n${resumeText.substring(0, 3000)}`  // ✅ Limit input text
+    }
+  ],
+  temperature: 0.7,
+  max_tokens: 1000,  // ✅ Reduced from 2500
+
+});
+
+// Robust analyzer that extracts text and returns richer analysis
+
+
+
+    const optimizedResume = completion.choices[0].message.content;
+    console.log('✅ OpenAI optimization complete');
+
+    // Calculate analysis score
+    const analysisScore = calculateResumeScore(optimizedResume);
+
+    // Clean up uploaded file
+    await fs.unlink(req.file.path);
+
+    res.json({
+      success: true,
+      fileName: req.file.originalname,
+      analysis: {
+        score: analysisScore.score,
+        atsCompatibility: analysisScore.atsCompatibility,
+        improvements: [
+          'Enhanced with strong action verbs',
+          'Added quantifiable achievements',
+          'Optimized for ATS systems',
+          'Improved professional formatting',
+          'Added relevant industry keywords'
+        ]
+      },
+      optimizedResume: optimizedResume
+    });
+
+  } catch (error) {
+    console.error('❌ Error processing resume:', error);
+    
+    // Clean up file if it exists
+    if (req.file && req.file.path) {
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting file:', unlinkError);
+      }
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to process resume',
+      message: error.message 
+    });
+  }
+});
+
+
+
+
+// Helper function to generate mock optimized resume
+function generateMockOptimizedResume(originalText, fileName) {
+  // Try to extract name from filename
+  const name = fileName.replace(/\.(pdf|docx)$/i, '').replace(/_/g, ' ').replace(/-/g, ' ');
+  
+  return `${name.toUpperCase()}
+john.doe@email.com | (555) 123-4567 | San Francisco, CA | linkedin.com/in/johndoe
+
+PROFESSIONAL SUMMARY
+Results-driven Software Engineer with 5+ years of experience developing scalable web applications. Proven track record of leading cross-functional teams and delivering high-impact projects that increased user engagement by 40%. Expert in modern JavaScript frameworks and cloud technologies.
+
+PROFESSIONAL EXPERIENCE
+
+Senior Software Engineer | Tech Company Inc.
+January 2022 - Present
+- Led development of microservices architecture serving 2M+ users, improving system performance by 45%
+- Implemented CI/CD pipeline reducing deployment time from 2 hours to 15 minutes
+- Mentored team of 5 junior developers, improving code quality and reducing bugs by 30%
+- Collaborated with product team to deliver 12+ features, increasing user retention by 25%
+
+Software Engineer | StartUp Solutions
+June 2019 - December 2021
+- Developed RESTful APIs handling 100K+ daily requests with 99.9% uptime
+- Reduced page load time by 60% through optimization and lazy loading implementation
+- Built responsive React components used across 50+ pages
+- Participated in Agile sprints, consistently delivering features ahead of schedule
+
+Junior Software Engineer | Digital Agency
+May 2017 - May 2019
+- Contributed to 15+ client projects using React, Node.js, and MongoDB
+- Improved website accessibility scores by 35% through WCAG compliance implementation
+- Automated testing processes, reducing QA time by 40%
+
+EDUCATION
+
+Bachelor of Science in Computer Science
+University of Technology | 2017
+GPA: 3.8/4.0
+
+TECHNICAL SKILLS
+
+Languages: JavaScript, Python, TypeScript, Java, SQL
+Frameworks: React, Node.js, Express, Django, Next.js
+Tools: Git, Docker, AWS, MongoDB, PostgreSQL, Redis
+Methodologies: Agile, Scrum, Test-Driven Development (TDD)
+
+CERTIFICATIONS
+- AWS Certified Solutions Architect
+- MongoDB Certified Developer
+
+---
+✓ Optimized for ATS systems
+✓ Strong action verbs
+✓ Quantifiable achievements
+✓ Relevant keywords
+✓ Professional formatting`;
+}
+
+// Helper function to calculate score
+function calculateResumeScore(resumeText) {
+  let score = 70;
+  
+  // Check for metrics
+  if (/\d+%|\$\d+|\d+\+/.test(resumeText)) score += 10;
+  
+  // Check for action verbs
+  const actionVerbs = ['Led', 'Developed', 'Implemented', 'Achieved', 'Improved', 'Managed'];
+  const hasActionVerbs = actionVerbs.some(verb => resumeText.includes(verb));
+  if (hasActionVerbs) score += 5;
+  
+  // Check for sections
+  if (resumeText.includes('EXPERIENCE') || resumeText.includes('WORK')) score += 5;
+  if (resumeText.includes('EDUCATION')) score += 5;
+  if (resumeText.includes('SKILLS')) score += 5;
+  
+  const atsCompatibility = score >= 90 ? 'High' : score >= 75 ? 'Medium' : 'Low';
+  
+  return { score: Math.min(score, 100), atsCompatibility };
+}
+
+// Analyze LinkedIn profile
+app.post('/api/analyze/linkedin', async (req, res) => {
+  try {
+    const { url, linkedinText } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: 'LinkedIn URL is required' });
+    }
+
+    // Validate LinkedIn URL if provided
+    if (url) {
+      const linkedinPattern = /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|profile)\/[a-zA-Z0-9_-]+\/?$/;
+      if (!linkedinPattern.test(url)) {
+        return res.status(400).json({ error: 'Invalid LinkedIn URL format' });
+      }
+    }
+
+    console.log('🔗 LinkedIn URL received:', url);
+
+    // Check if OpenAI API key is configured
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      console.log('⚠️  OpenAI API key not configured, returning mock data');
+      
+      const mockResult = {
+        success: true,
+        profileUrl: url,
+        analyzedAt: new Date().toISOString(),
+        analysis: {
+          score: 78,
+          profileStrength: 'Strong',
+          strengths: [
+            '✅ Professional headline is clear and keyword-rich',
+            '✅ Good number of connections shows networking',
+            '✅ Experience section is well-detailed',
+            '✅ Profile photo is professional'
+          ],
+          improvements: [
+            '🔧 Add more detailed project descriptions',
+            '🔧 Request recommendations from colleagues',
+            '🔧 Publish articles to increase visibility',
+            '🔧 Add volunteer experience if applicable'
+          ],
+          recommendations: [
+            '💡 Optimize headline with industry keywords',
+            '💡 Showcase measurable achievements',
+            '💡 Update profile regularly',
+            '💡 Engage with industry content'
+          ],
+          suggestedKeywords: [
+            'software development',
+            'full stack',
+            'JavaScript',
+            'React',
+            'Node.js'
+          ]
+        }
+      };
+
+      setTimeout(() => {
+        res.json(mockResult);
+      }, 1500);
+      return;
+    }
+
+    // If OpenAI is configured, use it
+    console.log('🤖 Using OpenAI for LinkedIn analysis...');
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a LinkedIn optimization expert. Analyze LinkedIn profiles and provide feedback in JSON format.
+
+Response structure:
+{
+  "score": <number 0-100>,
+  "profileStrength": "<Strong/Good/Needs Improvement>",
+  "strengths": ["strength 1", "strength 2", "strength 3", "strength 4"],
+  "improvements": ["improvement 1", "improvement 2", "improvement 3", "improvement 4"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3", "recommendation 4"],
+  "suggestedKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
+}
+
+Respond with ONLY valid JSON, no other text.`
+          },
+          {
+            role: "user",
+            content: `Analyze the following LinkedIn profile$${url ? ` (URL: ${url})` : ''} and provide the requested JSON.
+
+${linkedinText ? `PROFILE TEXT:\n${linkedinText.slice(0, 12000)}` : 'No profile text provided. Use general best practices.'}
+
+Provide optimization suggestions focusing on:
+1. Profile completeness and quality
+2. Headline and summary effectiveness
+3. Experience descriptions
+4. Skills and endorsements
+5. Overall visibility and networking
+
+Return ONLY a valid JSON object.`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      });
+
+      let aiResponse = completion.choices[0].message.content.trim();
+      console.log('🤖 OpenAI response received');
+
+      // Clean up response
+      aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+      let aiAnalysis;
+      try {
+        aiAnalysis = JSON.parse(aiResponse);
+      } catch (parseError) {
+        console.error('❌ Failed to parse OpenAI response:', parseError);
+        
+        // Try to extract JSON
+        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          aiAnalysis = JSON.parse(jsonMatch[0]);
+          console.log('✅ Extracted JSON successfully');
+        } else {
+          throw new Error('Could not extract valid JSON');
+        }
+      }
+
+      // Validate required fields
+      if (!aiAnalysis.score || !aiAnalysis.strengths || !aiAnalysis.improvements) {
+        throw new Error('Missing required fields in AI response');
+      }
+
+      res.json({
+        success: true,
+        profileUrl: url,
+        analyzedAt: new Date().toISOString(),
+        analysis: aiAnalysis
+      });
+
+    } catch (aiError) {
+      console.error('❌ OpenAI Error:', aiError.message);
+      
+      // Fallback to mock data
+      console.log('⚠️  Falling back to mock data...');
+      
+      const mockResult = {
+        success: true,
+        profileUrl: url,
+        analyzedAt: new Date().toISOString(),
+        analysis: {
+          score: 78,
+          profileStrength: 'Strong',
+          strengths: [
+            '✅ Professional headline is clear',
+            '✅ Good networking presence',
+            '✅ Detailed experience section',
+            '✅ Professional profile photo'
+          ],
+          improvements: [
+            '🔧 Add more project descriptions',
+            '🔧 Request colleague recommendations',
+            '🔧 Publish industry articles',
+            '🔧 Add volunteer experience'
+          ],
+          recommendations: [
+            '💡 Optimize headline with keywords',
+            '💡 Add measurable achievements',
+            '💡 Update profile regularly',
+            '💡 Engage with content'
+          ],
+          suggestedKeywords: [
+            'software development',
+            'full stack',
+            'JavaScript',
+            'React',
+            'Node.js'
+          ]
+        }
+      };
+
+      res.json(mockResult);
+    }
+
+  } catch (error) {
+    console.error('❌ Error analyzing LinkedIn:', error);
+    res.status(500).json({ 
+      error: 'Failed to analyze LinkedIn profile',
+      message: error.message 
+    });
+  }
+});
+
+// User authentication endpoints
+const users = [
+  {
+    id: 1,
+    name: 'John Doe',
+    email: 'test@test.com',
+    password: 'password123'
+  },
+  {
+    id: 2,
+    name: 'Jane Smith',
+    email: 'demo@demo.com',
+    password: 'demo123'
+  }
+];
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required'
+      });
+    }
+
+    // Find user in database
+    const user = await User.findOne({ email });
+
+    if (!user || user.password !== password) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid email or password'
+      });
+    }
+
+    // Migrate user if they don't have plan/usage fields (for existing users)
+    let needsMigration = false;
+    if (!user.plan || !user.plan.type) {
+      console.log('🔄 Migrating user plan fields for:', email);
+      user.plan = {
+        type: 'free',
+        status: 'active',
+        startDate: user.createdAt || new Date(),
+        endDate: null,
+        paymentId: null,
+        features: {
+          maxUploads: 3,
+          maxGenerations: 1,
+          hasTemplates: false,
+          hasAdvancedAI: false,
+          hasPrioritySupport: false
+        }
+      };
+      needsMigration = true;
+    }
+
+    if (!user.usage) {
+      console.log('🔄 Migrating user usage fields for:', email);
+      user.usage = {
+        uploadsCount: 0,
+        generationsCount: 0,
+        lastUpload: null
+      };
+      needsMigration = true;
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+
+    // Save if migration was needed
+    if (needsMigration) {
+      await user.save();
+      console.log('✅ User migrated successfully');
+    } else {
+      await user.save();
+    }
+
+    console.log('✅ User logged in:', email);
+    console.log('📦 User plan:', user.plan.type, '- Status:', user.plan.status);
+    console.log('📊 Usage - Uploads:', user.usage.uploadsCount, 'Generations:', user.usage.generationsCount);
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        plan: {
+          type: user.plan.type,
+          status: user.plan.status,
+          startDate: user.plan.startDate,
+          endDate: user.plan.endDate,
+          paymentId: user.plan.paymentId,
+          features: user.plan.features
+        },
+        usage: {
+          uploadsCount: user.usage.uploadsCount,
+          generationsCount: user.usage.generationsCount,
+          lastUpload: user.usage.lastUpload
+        }
+      },
+      token: 'mock-jwt-token-' + Date.now()
+    });
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Login failed',
+      message: error.message 
+    });
+  }
+});
+
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name, email, and password are required'
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+    }
+
+    // Create new user with default plan (free)
+    // The schema defaults will automatically set:
+    // - plan.type: 'free'
+    // - plan.status: 'active'
+    // - plan.startDate: Date.now()
+    // - plan.features: free plan defaults
+    // - usage: default values (0 uploads, 0 generations)
+    const newUser = new User({
+      name,
+      email,
+      password // In production, hash this with bcrypt!
+    });
+
+    await newUser.save();
+    console.log('✅ New user saved to database:', email);
+    console.log('📦 User plan:', newUser.plan.type, '- Status:', newUser.plan.status);
+
+    res.json({
+      success: true,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        plan: {
+          type: newUser.plan.type,
+          status: newUser.plan.status,
+          startDate: newUser.plan.startDate,
+          features: newUser.plan.features
+        },
+        usage: {
+          uploadsCount: newUser.usage.uploadsCount,
+          generationsCount: newUser.usage.generationsCount
+        }
+      },
+      token: 'mock-jwt-token-' + Date.now()
+    });
+  } catch (error) {
+    console.error('❌ Signup error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Signup failed',
+      message: error.message 
+    });
+  }
+});
+
+// Change password (basic, plaintext for current setup)
+app.post('/api/auth/change-password', async (req, res) => {
+  try {
+    const { userId, email, currentPassword, newPassword } = req.body || {};
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters' });
+    }
+    const query = userId ? { _id: userId } : email ? { email } : null;
+    if (!query) {
+      return res.status(400).json({ success: false, error: 'userId or email is required' });
+    }
+    const user = await User.findOne(query);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    if (!currentPassword || user.password !== currentPassword) {
+      return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+    }
+    user.password = newPassword; // NOTE: In production, hash with bcrypt.
+    await user.save();
+    res.json({ success: true, message: 'Password updated' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, error: 'Failed to change password' });
+  }
+});
+
+// Persist an analysis record (file/linkedin/generated)
+app.post('/api/analyses/save', async (req, res) => {
+  try {
+    const { userId, analysisType = 'file', fileName, fileSize = 0, analysis, optimizedResume } = req.body || {};
+    if (!fileName) {
+      return res.status(400).json({ success: false, error: 'fileName is required' });
+    }
+    const AnalysisModel = require('./models/Analysis');
+    const doc = await AnalysisModel.create({
+      userId: userId || undefined,
+      analysisType,
+      fileName,
+      fileSize,
+      results: analysis,
+      optimizedResume
+    });
+    res.json({ success: true, id: doc._id });
+  } catch (error) {
+    console.error('Save analysis error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save analysis' });
+  }
+});
+
+// Migration endpoint to update all existing users with plan and usage fields
+app.post('/api/admin/migrate-users', async (req, res) => {
+  try {
+    console.log('🔄 Starting user migration...');
+    
+    const users = await User.find({});
+    let migratedCount = 0;
+    let errors = [];
+
+    for (const user of users) {
+      try {
+        let needsUpdate = false;
+
+        // Check if plan field is missing or incomplete
+        if (!user.plan || !user.plan.type) {
+          user.plan = {
+            type: 'free',
+            status: 'active',
+            startDate: user.createdAt || new Date(),
+            endDate: null,
+            paymentId: null,
+            features: {
+              maxUploads: 3,
+              maxGenerations: 1,
+              hasTemplates: false,
+              hasAdvancedAI: false,
+              hasPrioritySupport: false
+            }
+          };
+          needsUpdate = true;
+        }
+
+        // Check if usage field is missing or incomplete
+        if (!user.usage) {
+          user.usage = {
+            uploadsCount: 0,
+            generationsCount: 0,
+            lastUpload: null
+          };
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          await user.save();
+          migratedCount++;
+          console.log(`✅ Migrated user: ${user.email}`);
+        }
+      } catch (error) {
+        errors.push({ email: user.email, error: error.message });
+        console.error(`❌ Error migrating user ${user.email}:`, error.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Migration complete. ${migratedCount} users migrated.`,
+      migratedCount,
+      totalUsers: users.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+    console.log(`✅ Migration complete: ${migratedCount}/${users.length} users migrated`);
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Migration failed',
+      message: error.message
+    });
+  }
+});
+
+
+// Generate optimized resume
+/*app.post('/api/generate/resume', async (req, res) => {
+  try {
+    const { analysis, fileName } = req.body;
+
+    // New: generate a valid PDF so it opens in editors like Acrobat
+    try {
+      const { renderPlainTextPDF } = require('./utils/resumePdf');
+      const parts = [];
+      parts.push(`Optimized from: ${fileName}`);
+      if (analysis?.score) parts.push(`Analysis Score: ${analysis.score}/100`);
+      if (analysis?.atsCompatibility) parts.push(`ATS Compatibility: ${analysis.atsCompatibility}`);
+      if (Array.isArray(analysis?.strengths) && analysis.strengths.length) {
+        parts.push('\nStrengths:');
+        analysis.strengths.forEach(s => parts.push(` • ${s}`));
+      }
+      if (Array.isArray(analysis?.improvements) && analysis.improvements.length) {
+        parts.push('\nImprovements Applied:');
+        analysis.improvements.forEach(s => parts.push(` • ${s}`));
+      }
+      if (Array.isArray(analysis?.suggestedKeywords) && analysis.suggestedKeywords.length) {
+        parts.push(`\nSuggested Keywords: ${analysis.suggestedKeywords.join(', ')}`);
+      }
+      const text = parts.join('\n');
+      const safeName = (fileName || 'resume').replace(/[^a-z0-9_\-\.]+/gi, '_');
+      renderPlainTextPDF(res, 'Optimized Resume', text, `optimized_${safeName}.pdf`);
+      return;
+    } catch (_) {}
+
+    console.log('📝 Generating optimized resume...');
+
+    const resumeContent = `
+OPTIMIZED RESUME
+Generated by ResuMind
+
+Original File: ${fileName}
+Analysis Score: ${analysis.score}/100
+ATS Compatibility: ${analysis.atsCompatibility || 'High'}
+
+STRENGTHS:
+${analysis.strengths.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+IMPROVEMENTS MADE:
+${analysis.improvements.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
+
+SUGGESTED KEYWORDS ADDED:
+${analysis.suggestedKeywords?.join(', ') || 'N/A'}
+
+---
+This is a sample optimized resume.
+In production, this would be a professionally formatted PDF.
+    `;
+
+    // Send as a proper PDF instead of plain text
+    const { renderPlainTextPDF } = require('./utils/resumePdf');
+    const filenameAI = `${(formData.fullName || 'Candidate').replace(/\s+/g, '_')}_Resume_AI.pdf`;
+    renderPlainTextPDF(res, `${formData.fullName || 'Candidate'} — Resume`, aiResume, filenameAI);
+    return;
+    res.setHeader('Content-Disposition', `attachment; filename="optimized_${fileName}.txt"`);
+    
+    res.send(resumeContent);
+
+  } catch (error) {
+    console.error('❌ Error generating resume:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate resume',
+      message: error.message 
+    });
+  }
+}); */
+
+// Get user's analyses
+app.get('/api/user/analyses/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validate userId
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.json({
+        success: true,
+        analyses: []
+      });
+    }
+
+    const Analysis = require('./models/Analysis');
+    
+    const analyses = await Analysis.find({ userId }).sort({ createdAt: -1 }).limit(20);
+    const mapped = analyses.map(a => ({
+      _id: a._id,
+      fileName: a.fileName,
+      createdAt: a.createdAt,
+      score: a.results?.score,
+      atsScore: a.results?.atsScore,
+      overallRating: a.results?.overallRating,
+      analysisType: a.analysisType
+    }));
+
+    res.json({ success: true, count: mapped.length, analyses: mapped });
+  } catch (error) {
+    console.error('❌ Error fetching user analyses:', error);
+    res.json({
+      success: true,
+      analyses: []
+    });
+  }
+});
+
+// Get all analyses (for dashboard)
+app.get('/api/analyses', async (req, res) => {
+  try {
+    const Analysis = require('./models/Analysis');
+    const analyses = await Analysis.find().sort({ createdAt: -1 }).limit(20);
+    const mapped = analyses.map(a => ({
+      _id: a._id,
+      fileName: a.fileName,
+      createdAt: a.createdAt,
+      score: a.results?.score,
+      atsScore: a.results?.atsScore,
+      overallRating: a.results?.overallRating,
+      analysisType: a.analysisType
+    }));
+
+    res.json({ success: true, count: mapped.length, analyses: mapped });
+  } catch (error) {
+    console.error('❌ Error fetching analyses:', error);
+    res.json({
+      success: true,
+      analyses: []
+    });
+  }
+});
+
+// Generate resume from questionnaire
+app.post('/api/generate/resume-from-scratch', async (req, res) => {
+  try {
+    const formData = req.body;
+
+    console.log('📝 Generating resume from questionnaire...');
+    console.log('👤 Name:', formData.fullName);
+
+    // Check if OpenAI is configured
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      console.log('⚠️  OpenAI not configured, generating basic resume...');
+      
+      // Generate a valid PDF with a basic resume (no AI)
+      const { renderResumePDF } = require('./utils/resumePdf');
+      const filename = `${(formData.fullName || 'Candidate').replace(/\s+/g, '_')}_Resume.pdf`;
+      renderResumePDF(res, formData, filename);
+      return;
+    }
+
+    // Use OpenAI to generate professional resume
+    console.log('🤖 Using AI to generate professional resume...');
+
+    const prompt = buildResumePrompt(formData);
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert resume writer and career coach. Create professional, ATS-optimized resumes that highlight achievements and use strong action verbs. Format the resume in a clean, professional structure with clear sections.`
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+
+    const aiResume = completion.choices[0].message.content;
+    console.log('✅ AI resume generated successfully');
+
+    // Send as downloadable file
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${formData.fullName.replace(/\s+/g, '_')}_Resume_AI.txt"`);
+    res.send(aiResume);
+
+  } catch (error) {
+    console.error('❌ Error generating resume:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate resume',
+      message: error.message 
+    });
+  }
+});
+
+// Helper function to build AI prompt
+function buildResumePrompt(data) {
+  return `Create a professional and well designed, ATS-optimized resume for the following candidate based on their information:
+
+PERSONAL INFORMATION:
+Name: ${data.fullName}
+Email: ${data.email}
+Phone: ${data.phone}
+Location: ${data.location}
+LinkedIn: ${data.linkedinUrl || 'N/A'}
+Portfolio: ${data.portfolioUrl || 'N/A'}
+
+PROFESSIONAL SUMMARY:
+Current Title: ${data.jobTitle}
+Years of Experience: ${data.yearsExperience}
+Target Role: ${data.targetRole}
+Key Skills: ${data.keySkills}
+
+WORK EXPERIENCE:
+${data.experiences.map((exp, i) => `
+Experience ${i + 1}:
+Company: ${exp.company}
+Position: ${exp.position}
+Duration: ${exp.startDate} to ${exp.currentlyWorking ? 'Present' : exp.endDate}
+Responsibilities:
+${exp.responsibilities}
+Achievements:
+${exp.achievements}
+`).join('\n')}
+
+EDUCATION:
+${data.education.map((edu, i) => `
+Education ${i + 1}:
+Institution: ${edu.institution}
+Degree: ${edu.degree} in ${edu.field}
+Graduation Year: ${edu.graduationYear}
+GPA: ${edu.gpa || 'N/A'}
+`).join('\n')}
+
+SKILLS:
+Technical Skills: ${data.technicalSkills}
+Soft Skills: ${data.softSkills || 'N/A'}
+Languages: ${data.languages || 'N/A'}
+Certifications: ${data.certifications || 'N/A'}
+
+ADDITIONAL:
+Projects: ${data.projects || 'N/A'}
+Awards: ${data.awards || 'N/A'}
+Interests: ${data.interests || 'N/A'}
+
+Please create a professional resume with:
+1. A compelling professional summary (3-4 sentences)
+2. Well-formatted work experience with strong action verbs
+3. Quantified achievements where possible
+4. Clear skills section organized by category
+5. Professional formatting suitable for ATS systems
+6. Proper spacing and section headers
+
+Format the resume in plain text with clear sections and bullet points.`;
+}
+
+// Helper function to generate basic resume (without AI)
+function generateBasicResume(data) {
+  return `
+${data.fullName.toUpperCase()}
+${data.email} | ${data.phone} | ${data.location}
+${data.linkedinUrl ? `LinkedIn: ${data.linkedinUrl}` : ''}
+${data.portfolioUrl ? `Portfolio: ${data.portfolioUrl}` : ''}
+
+${'='.repeat(80)}
+
+PROFESSIONAL SUMMARY
+${'-'.repeat(80)}
+${data.jobTitle} with ${data.yearsExperience} of experience in ${data.targetRole}.
+Key expertise: ${data.keySkills}
+
+WORK EXPERIENCE
+${'-'.repeat(80)}
+${data.experiences.map(exp => `
+${exp.position} | ${exp.company}
+${exp.startDate} - ${exp.currentlyWorking ? 'Present' : exp.endDate}
+
+Responsibilities:
+${exp.responsibilities}
+
+${exp.achievements ? `Achievements:\n${exp.achievements}` : ''}
+`).join('\n')}
+
+EDUCATION
+${'-'.repeat(80)}
+${data.education.map(edu => `
+${edu.degree} in ${edu.field}
+${edu.institution} | Graduated: ${edu.graduationYear}
+${edu.gpa ? `GPA: ${edu.gpa}` : ''}
+`).join('\n')}
+
+SKILLS
+${'-'.repeat(80)}
+Technical Skills: ${data.technicalSkills}
+${data.softSkills ? `Soft Skills: ${data.softSkills}` : ''}
+${data.languages ? `Languages: ${data.languages}` : ''}
+
+${data.certifications ? `CERTIFICATIONS\n${'-'.repeat(80)}\n${data.certifications}\n` : ''}
+${data.projects ? `PROJECTS\n${'-'.repeat(80)}\n${data.projects}\n` : ''}
+${data.awards ? `AWARDS & ACHIEVEMENTS\n${'-'.repeat(80)}\n${data.awards}\n` : ''}
+${data.interests ? `INTERESTS\n${'-'.repeat(80)}\n${data.interests}` : ''}
+
+${'='.repeat(80)}
+Generated by ResuMind - ${new Date().toLocaleDateString()}
+`;
+}
+
+
+
+
+console.log(app._router.stack.map(r => r.route && r.route.path).filter(Boolean));
+
+
+
+// New: Generate optimized resume combining sources (file, LinkedIn, questionnaire)
+// New: Generate optimized resume combining sources (file, LinkedIn, questionnaire)
+app.post('/api/generate/resume-optimized', upload.single('resume'), async (req, res) => {
+  console.log('🔥 /api/generate/resume-optimized hit');
+  console.log('File:', req.file && req.file.originalname);
+  console.log('Body keys:', Object.keys(req.body));
+
+  try {
+    const body = req.body || {};
+
+    const parseMaybeJson = (v) => {
+      if (!v) return null;
+      if (typeof v === 'object') return v;
+      try { return JSON.parse(v); } catch (_) { return null; }
+    };
+
+    const analysis = parseMaybeJson(body.analysis);
+    const questionnaire = parseMaybeJson(body.questionnaire);
+    const linkedinUrl = body.linkedinUrl || '';
+    const linkedinText = body.linkedinText || '';
+    const originalFileName = body.fileName || (req.file ? req.file.originalname : 'resume');
+
+    // === Extract resume text if uploaded ===
+    let fileText = '';
+if (req.file) {
+  try {
+    const ext = (path.extname(req.file.originalname) || '').toLowerCase();
+    const mime = req.file.mimetype;
+
+    console.log('📄 Uploaded file MIME type:', mime, 'Extension:', ext);
+
+    if (mime === 'application/pdf' || ext === '.pdf') {
+      const dataBuffer = fsSync.readFileSync(req.file.path);
+      const pdfData = await pdfParse(dataBuffer);
+      fileText = pdfData.text || '';
+    } else if (
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mime === 'application/octet-stream' ||
+      ext === '.docx'
+    ) {
+      // DOCX fallback if Mammoth fails
+      const result = await mammoth.extractRawText({ path: req.file.path });
+      fileText = result.value?.trim() || '';
+
+      if (!fileText) {
+        console.warn('⚠️ Mammoth returned empty text, using XML fallback...');
+        const raw = fsSync.readFileSync(req.file.path);
+        fileText = raw.toString('utf8').replace(/<[^>]+>/g, ' ').slice(0, 20000);
+      }
+    } else {
+      console.warn('⚠️ Unsupported MIME type:', mime);
+    }
+
+    fileText = fileText.replace(/\s+/g, ' ').trim();
+  } catch (e) {
+    console.error('❌ File extraction error:', e);
+  }
+}
+
+console.log('🧾 Extracted resume text preview:\n', (fileText || '[EMPTY]').slice(0, 600));
+
+
+    console.log('🧾 Extracted resume text preview:\n', (fileText || '').slice(0, 600));
+
+    const truncate = (s, n = 6000) => (s || '').toString().slice(0, n);
+
+    // === Fallback (no OpenAI key) ===
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      const { renderResumePDF, renderPlainTextPDF } = require('./utils/resumePdf');
+      if (questionnaire) {
+        const base = (questionnaire.fullName || 'Candidate').replace(/\s+/g, '_').replace(/[^a-z0-9_\-\.]+/gi, '');
+        const filename = `${base || 'Candidate'}_Resume.pdf`;
+        renderResumePDF(res, questionnaire, filename);
+        return;
+      }
+      const safeName = (originalFileName || 'resume').replace(/[^a-z0-9_\-\.]+/gi, '_');
+      renderPlainTextPDF(res, 'Optimized Resume (Basic)', truncate(fileText) || 'Resume content unavailable.', `optimized_${safeName}.pdf`);
+      return;
+    }
+
+    // === Use OpenAI for structured resume generation ===
+    const systemPrompt = `
+You are a professional resume writer and ATS optimization expert.
+Create a modern, complete resume in clean STRUCTURED JSON. DO NOT include explanations.
+
+JSON format:
+{
+  "basics": {"name": "", "email": "", "phone": "", "location": "", "linkedin": "", "portfolio": ""},
+  "summary": "",
+  "experiences": [
+    {"company": "", "position": "", "startDate": "", "endDate": "", "currentlyWorking": false,
+     "responsibilities": ["..."], "achievements": ["..."]}
+  ],
+  "education": [
+    {"institution": "", "degree": "", "field": "", "graduationYear": "", "gpa": ""}
+  ],
+  "skills": {"technical": "", "soft": "", "languages": ""},
+  "projects": "",
+  "certifications": "",
+  "awards": "",
+  "interests": ""
+}
+`;
+
+    const userContent = [
+      questionnaire ? `QUESTIONNAIRE DATA:\n${JSON.stringify(questionnaire)}` : null,
+      fileText ? `UPLOADED RESUME TEXT:\n${truncate(fileText)}` : null,
+      linkedinUrl ? `LINKEDIN URL: ${linkedinUrl}` : null,
+      linkedinText ? `LINKEDIN PROFILE TEXT:\n${truncate(linkedinText)}` : null,
+      analysis ? `ANALYSIS DATA:\n${JSON.stringify(analysis)}` : null,
+      'Instructions: Use all available information to create a concise, professional, ready-to-use resume in JSON format.'
+    ].filter(Boolean).join('\n\n');
+
+    console.log('🤖 Sending data to OpenAI...');
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      temperature: 0.5,
+      max_tokens: 2000
+    });
+
+    let content = completion.choices[0].message.content.trim();
+    content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    let structured;
+    try {
+      structured = JSON.parse(content);
+    } catch (e) {
+      console.warn('⚠️ JSON parse failed, returning raw text PDF');
+      const { renderPlainTextPDF } = require('./utils/resumePdf');
+      const safeName = (originalFileName || 'resume').replace(/[^a-z0-9_\-\.]+/gi, '_');
+      renderPlainTextPDF(res, 'Optimized Resume (Raw)', content, `optimized_${safeName}.pdf`);
+      return;
+    }
+
+    const { renderResumePDF } = require('./utils/resumePdf');
+    const baseName = (structured?.basics?.name || questionnaire?.fullName || 'Candidate')
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_\-\.]+/gi, '');
+    const finalName = `${baseName || 'Candidate'}_Resume.pdf`;
+
+    console.log('✅ Structured resume generated. Rendering PDF...');
+    renderResumePDF(res, structured, finalName);
+
+  } catch (error) {
+    console.error('❌ Error generating optimized resume:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to generate optimized resume', message: error.message });
+    }
+  } finally {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+  }
+
+ 
+
+});
+
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    availableRoutes: [
+      'GET /api/health',
+      'POST /api/analyze/file',
+      'POST /api/analyze/file-robust',
+      'POST /api/analyze/linkedin',
+      'POST /api/auth/login',
+      'POST /api/auth/signup',
+      'POST /api/generate/resume',
+      'POST /api/generate/resume-optimized',
+      'POST /api/admin/migrate-users'
+    ]
+  });
+});
+
+
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('🚀 ========================================');
+  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+  console.log(`📁 Uploads directory: ${uploadsDir}`);
+  console.log(`🤖 OpenAI configured: ${process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your-openai-api-key-here' ? 'Yes ✅' : 'No ❌ (using mock data)'}`);
+  console.log('🚀 ========================================');
+  console.log('📋 Available routes:');
+  console.log('   GET  /api/health');
+  console.log('   POST /api/analyze/file');
+  console.log('   POST /api/analyze/file-robust');
+  console.log('   POST /api/analyze/linkedin');
+  console.log('   POST /api/auth/login');
+  console.log('   POST /api/auth/signup');
+  console.log('   POST /api/generate/resume');
+  console.log('   POST /api/admin/migrate-users');
+  console.log('   POST /api/generate/resume-optimized');
+  console.log('   POST /api/admin/change-user-plan');
+  console.log('   POST /api/admin/user/:email');
+  console.log('   GET /api/admin/users');
+  console.log('🚀 ========================================');
+});
+
+// ✅ global error handler
+app.use((err, req, res, next) => {
+  console.error('💥 Server error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: err.message
+  });
+});
+
