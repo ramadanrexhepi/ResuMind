@@ -1,4 +1,4 @@
-# ResuMind - AI Resume Optimizer 🚀
+# ResuMind - AI Resume Optimizer 
 
 > Transform your resume with AI-powered analysis and optimization. Get professional, ATS-friendly resumes in minutes.
 
@@ -6,7 +6,7 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)
 
-## 🌟 Features
+##  Features
 
 - ** Resume Upload & Analysis** - Upload PDF or DOCX resumes for instant AI-powered feedback
 - ** LinkedIn Profile Analysis** - Analyze LinkedIn profiles directly with URL input
