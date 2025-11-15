@@ -171,16 +171,6 @@ ResuMind/
 └── README.md
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
 ## 🐛 Known Issues
 
 - Large file uploads (>10MB) may timeout
@@ -192,7 +182,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [ ] Resume comparison feature
 - [ ] Job description matching
 - [ ] Cover letter generation
-- [ ] User authentication & saved resumes
 - [ ] Multi-language support
 - [ ] Mobile app
 
@@ -213,11 +202,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenAI for GPT-4o API
 - MongoDB Atlas for cloud database
 - Create React App for frontend boilerplate
-- All contributors and users of ResuMind
 
-## 📞 Support
 
-For support, email ramadan@ramadanrexhepi.dev or open an issue on GitHub.
 
 ---
 
