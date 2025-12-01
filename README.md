@@ -1,4 +1,4 @@
-# ResuMind - AI Resume Optimizer 🚀
+# ResuMind - AI Resume Optimizer 
 
 > Transform your resume with AI-powered analysis and optimization. Get professional, ATS-friendly resumes in minutes.
 
@@ -6,21 +6,21 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)
 
-## 🌟 Features
+##  Features
 
-- **📄 Resume Upload & Analysis** - Upload PDF or DOCX resumes for instant AI-powered feedback
-- **🔗 LinkedIn Profile Analysis** - Analyze LinkedIn profiles directly with URL input
-- **🤖 GPT-4o Integration** - Leverage OpenAI's latest model for intelligent resume optimization
-- **✨ Professional PDF Generation** - Create beautifully formatted, ATS-compatible resumes
-- **📊 Detailed Scoring** - Get comprehensive scores across multiple resume categories
-- **💼 ATS Optimization** - Ensure your resume passes Applicant Tracking Systems
-- **🎯 Personalized Recommendations** - Receive actionable feedback to improve your resume
+- ** Resume Upload & Analysis** - Upload PDF or DOCX resumes for instant AI-powered feedback
+- ** LinkedIn Profile Analysis** - Analyze LinkedIn profiles directly with URL input
+- ** GPT-4o Integration** - Leverage OpenAI's latest model for intelligent resume optimization
+- ** Professional PDF Generation** - Create beautifully formatted, ATS-compatible resumes
+- ** Detailed Scoring** - Get comprehensive scores across multiple resume categories
+- ** ATS Optimization** - Ensure your resume passes Applicant Tracking Systems
+- ** Personalized Recommendations** - Receive actionable feedback to improve your resume
 
-## 🖼️ Screenshots
+## Screenshots
 
 *Coming soon - Add screenshots of your app here*
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 - **React.js** - UI framework
@@ -37,7 +37,7 @@
 - **PDF-Parse** - PDF text extraction
 - **Mammoth** - DOCX file processing
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -89,7 +89,7 @@
 ```
    Frontend will run on `http://localhost:3000`
 
-## 📖 Usage
+##  Usage
 
 1. **Upload Your Resume**
    - Navigate to the upload page
@@ -108,7 +108,7 @@
    - Click "Generate Optimized Resume"
    - Download your professional PDF
 
-## 🔧 API Endpoints
+##  API Endpoints
 
 ### Resume Analysis
 ```http
@@ -142,7 +142,7 @@ Body:
 }
 ```
 
-## 🌍 Environment Variables
+##  Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
@@ -151,7 +151,7 @@ Body:
 | `OPENAI_API_KEY` | OpenAI API key | Yes |
 | `NODE_ENV` | Environment (development/production) | Yes |
 
-## 📁 Project Structure
+##  Project Structure
 ```
 ResuMind/
 ├── backend/
@@ -171,12 +171,12 @@ ResuMind/
 └── README.md
 ```
 
-## 🐛 Known Issues
+##  Known Issues
 
 - Large file uploads (>10MB) may timeout
 - LinkedIn scraping may be rate-limited
 
-## 📝 Future Enhancements
+##  Future Enhancements
 
 - [ ] Multiple resume templates
 - [ ] Resume comparison feature
@@ -185,11 +185,11 @@ ResuMind/
 - [ ] Multi-language support
 - [ ] Mobile app
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Author
+##  Author
 
 **Ramadan Rexhepi**
 
@@ -197,16 +197,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Portfolio: [ramadanrexhepi.dev](https://ramadanrexhepi.dev)
 - LinkedIn: [linkedin.com/in/ramadanrexhepi](https://linkedin.com/in/ramadanrexhepi)
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - OpenAI for GPT-4o API
 - MongoDB Atlas for cloud database
 - Create React App for frontend boilerplate
-
-
-
----
-
-⭐ **Star this repo if you find it helpful!** ⭐
-
-Made with ❤️ by Ramadan Rexhepi
