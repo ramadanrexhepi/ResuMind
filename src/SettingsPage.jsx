@@ -17,6 +17,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineExclamationCircle
 } from 'react-icons/hi';
+import { API_ENDPOINTS } from './config/api';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -26,9 +27,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const API_BASE = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-    ? 'http://localhost:5050'
-    : '';
 
   // Profile settings
   const [profileData, setProfileData] = useState({
@@ -216,7 +214,7 @@ export default function SettingsPage() {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
       };
-      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+      const res = await fetch(API_ENDPOINTS.CHANGE_PASSWORD, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

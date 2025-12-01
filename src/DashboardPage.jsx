@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './DashboardPage.css';
-import { 
-  HiOutlineDocumentText, 
-  HiOutlineChartBar, 
+import {
+  HiOutlineDocumentText,
+  HiOutlineChartBar,
   HiOutlineClock,
   HiOutlineSparkles,
   HiOutlineUpload,
@@ -20,6 +20,7 @@ import {
   HiOutlineCreditCard,
   HiShieldCheck
 } from 'react-icons/hi';
+import { API_ENDPOINTS } from './config/api';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -113,7 +114,7 @@ export default function DashboardPage() {
           
           // Fetch analyses for the user
           const userId = parsedUser.id || parsedUser._id;
-          const res = await fetch(`http://localhost:5050/api/user/analyses/${userId}`, {
+          const res = await fetch(`API_ENDPOINTS.USER_ANALYSES(userId)`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

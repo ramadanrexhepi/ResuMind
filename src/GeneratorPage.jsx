@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './GeneratorPage.css';
 import { HiOutlineArrowLeft, HiOutlineArrowRight, HiOutlineSparkles, HiOutlineCheck } from 'react-icons/hi';
+import { API_ENDPOINTS } from './config/api';
 
 export default function GeneratorPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -145,7 +146,7 @@ export default function GeneratorPage() {
     setIsGenerating(true);
   
     try {
-      const response = await fetch("http://localhost:5050/api/generate/resume-from-scratch", {
+      const response = await fetch("API_ENDPOINTS.GENERATE_RESUME", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

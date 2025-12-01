@@ -205,17 +205,32 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://localhost:5173',
-  'http://127.0.0.1:5173'
-];
+  'http://127.0.0.1:5173',
+  'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app',
+  'https://resu-mind.vercel.app', // Add your production domain if different
+  process.env.FRONTEND_URL // Allow environment variable override
+].filter(Boolean); // Remove undefined values
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return cb(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+
+    // In production, be more permissive with Vercel preview deployments
+    if (origin.includes('vercel.app')) {
+      return cb(null, true);
+    }
+
+    console.warn('⚠️ Blocked by CORS:', origin);
     return cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 
 app.options('*', cors());

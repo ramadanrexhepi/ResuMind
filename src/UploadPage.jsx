@@ -3,14 +3,12 @@ import './UploadPage.css';
 import { HiOutlineUpload, HiOutlineArrowLeft } from 'react-icons/hi';
 import { FaLinkedin } from 'react-icons/fa';
 import ResultsDisplay from './ResultsDisplay';
+import { API_BASE_URL, API_ENDPOINTS } from './config/api';
 
 export default function UploadPage() {
   const savedUser = (() => {
     try { return JSON.parse(localStorage.getItem('user')); } catch (_) { return null; }
   })();
-  const API_BASE = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-    ? 'http://localhost:5050'
-    : '';
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [linkedinUrl, setLinkedinUrl] = useState('');
@@ -91,7 +89,7 @@ export default function UploadPage() {
         formData.append('resume', selectedFile);
         if (savedUser?.id) formData.append('userId', savedUser.id);
   
-        const response = await fetch(`${API_BASE}/api/analyze/file-robust`, {
+        const response = await fetch(API_ENDPOINTS.ANALYZE_FILE, {
           method: 'POST',
           body: formData,
         });
@@ -113,7 +111,7 @@ export default function UploadPage() {
   
         // Persist analysis
         try {
-          await fetch(`${API_BASE}/api/analyses/save`, {
+          await fetch(API_ENDPOINTS.SAVE_ANALYSIS, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -134,7 +132,7 @@ export default function UploadPage() {
           return;
         }
   
-        const response = await fetch(`${API_BASE}/api/analyze/linkedin`, {
+        const response = await fetch(API_ENDPOINTS.ANALYZE_LINKEDIN, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: linkedinUrl, linkedinText, userId: savedUser?.id }),
@@ -159,7 +157,7 @@ export default function UploadPage() {
   
         // Persist
         try {
-          await fetch(`${API_BASE}/api/analyses/save`, {
+          await fetch(API_ENDPOINTS.SAVE_ANALYSIS, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -289,7 +287,7 @@ export default function UploadPage() {
       console.log('🚀 Sending request to server...');
       
       // ✅ Send to optimized resume endpoint
-      const resp = await fetch(`${API_BASE}/api/generate/resume-optimized`, {
+      const resp = await fetch(API_ENDPOINTS.GENERATE_OPTIMIZED, {
         method: 'POST',
         body: formData,
       });
@@ -298,7 +296,7 @@ export default function UploadPage() {
       
       if (resp.status === 404) {
         console.warn('⚠️ Optimized endpoint not found, trying legacy...');
-        const respLegacy = await fetch(`${API_BASE}/api/generate/resume`, {
+        const respLegacy = await fetch(API_ENDPOINTS.GENERATE_RESUME, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
