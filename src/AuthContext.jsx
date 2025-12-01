@@ -3,14 +3,28 @@ import React, { createContext, useContext } from 'react';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Robust local/hosted base: use 127.0.0.1 in dev, same-origin otherwise
+  // API base URL configuration
   const API_BASE = (() => {
     try {
+      // Check if we're in development or production
       const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-      const isLocal = host === 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/auth' || host === 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/auth';
-      return (isLocal ? 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/auth' : '') + '/api/auth';
+      const isLocal = host === 'localhost' || host === '127.0.0.1';
+
+      // Use environment variable if available, otherwise use defaults
+      if (process.env.REACT_APP_API_URL) {
+        return process.env.REACT_APP_API_URL + '/api/auth';
+      }
+
+      // Development: use local backend
+      if (isLocal) {
+        return 'http://localhost:5050/api/auth';
+      }
+
+      // Production: fallback to custom domain
+      // You should set REACT_APP_API_URL in Vercel environment variables
+      return 'https://api.resumind.ramadanrexhepi.dev/api/auth';
     } catch (_) {
-      return 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/api/auth';
+      return 'http://localhost:5050/api/auth';
     }
   })();
   const signup = async (name, email, password) => {
