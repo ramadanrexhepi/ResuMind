@@ -4,8 +4,8 @@ const User = require('./models/User');
 
 const planFeatures = {
   free: {
-    maxUploads: 3,
-    maxGenerations: 1,
+    maxUploads: 2,
+    maxGenerations: 2,
     hasTemplates: false,
     hasAdvancedAI: false,
     hasPrioritySupport: false

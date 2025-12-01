@@ -58,8 +58,8 @@ async function migrateUsers() {
             endDate: null,
             paymentId: null,
             features: {
-              maxUploads: 3,
-              maxGenerations: 1,
+              maxUploads: 2,
+              maxGenerations: 2,
               hasTemplates: false,
               hasAdvancedAI: false,
               hasPrioritySupport: false

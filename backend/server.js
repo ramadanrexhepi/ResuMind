@@ -21,6 +21,156 @@ const connectDB = require('./config/database');
 const User = require('./models/User');
 const Analysis = require('./models/Analysis');
 
+const PLAN_FEATURES = Object.freeze({
+  free: {
+    maxUploads: 2,
+    maxGenerations: 2,
+    hasTemplates: false,
+    hasAdvancedAI: false,
+    hasPrioritySupport: false
+  },
+  pro: {
+    maxUploads: 999999,
+    maxGenerations: 999999,
+    hasTemplates: true,
+    hasAdvancedAI: true,
+    hasPrioritySupport: true
+  },
+  team: {
+    maxUploads: 999999,
+    maxGenerations: 999999,
+    hasTemplates: true,
+    hasAdvancedAI: true,
+    hasPrioritySupport: true
+  }
+});
+
+const DEFAULT_USAGE_STATE = Object.freeze({
+  uploadsCount: 0,
+  generationsCount: 0,
+  lastUpload: null
+});
+
+const LIMIT_ERROR_LABELS = {
+  analysis: 'Free plan analysis limit reached',
+  generation: 'Free plan optimization limit reached'
+};
+
+const LIMIT_MESSAGE_FALLBACK = {
+  analysis: PLAN_FEATURES.free.maxUploads,
+  generation: PLAN_FEATURES.free.maxGenerations
+};
+
+const LIMIT_FIELD_CONFIG = {
+  analysis: { usageKey: 'uploadsCount', limitKey: 'maxUploads' },
+  generation: { usageKey: 'generationsCount', limitKey: 'maxGenerations' }
+};
+
+const normalizeUserId = (value) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
+  return trimmed;
+};
+
+const clonePlanFeatures = (planType = 'free') => {
+  const source = PLAN_FEATURES[planType] || PLAN_FEATURES.free;
+  return { ...source };
+};
+
+const ensureUserPlanAndUsage = (user) => {
+  if (!user.plan || !user.plan.type) {
+    user.plan = {
+      type: 'free',
+      status: 'active',
+      startDate: user.createdAt || new Date(),
+      endDate: null,
+      paymentId: null,
+      features: clonePlanFeatures('free')
+    };
+  } else if (!user.plan.features) {
+    user.plan.features = clonePlanFeatures(user.plan.type);
+  }
+
+  if (!user.usage) {
+    user.usage = { ...DEFAULT_USAGE_STATE };
+  } else {
+    user.usage.uploadsCount = user.usage.uploadsCount || 0;
+    user.usage.generationsCount = user.usage.generationsCount || 0;
+    user.usage.lastUpload = user.usage.lastUpload || null;
+  }
+};
+
+const findUserForUsage = async (userId) => {
+  const normalized = normalizeUserId(userId);
+  if (!normalized) return null;
+  const user = await User.findById(normalized);
+  if (!user) return null;
+  ensureUserPlanAndUsage(user);
+  return user;
+};
+
+const getLimitMessage = (type, limit) => {
+  const resolvedLimit = typeof limit === 'number' ? limit : LIMIT_MESSAGE_FALLBACK[type] || 0;
+  if (type === 'generation') {
+    return `The free plan includes ${resolvedLimit} optimized resumes. Upgrade to Pro for unlimited downloads.`;
+  }
+  return `The free plan includes ${resolvedLimit} analyses. Upgrade to Pro for unlimited scans.`;
+};
+
+const checkFreeUsageLimit = (user, type) => {
+  const config = LIMIT_FIELD_CONFIG[type] || LIMIT_FIELD_CONFIG.analysis;
+  const limit = user.plan?.features?.[config.limitKey];
+  const used = user.usage?.[config.usageKey] || 0;
+  const reached = user.plan?.type === 'free' && typeof limit === 'number' && used >= limit;
+  return { reached, limit, used, ...config };
+};
+
+const requireUserForAction = async (req, type) => {
+  const userId = req.body?.userId || req.query?.userId || req.headers['x-user-id'];
+  const user = await findUserForUsage(userId);
+  if (!user) {
+    return { error: { status: 401, payload: { error: 'Authentication required', message: 'Please log in to continue.' } } };
+  }
+
+  const usageCheck = checkFreeUsageLimit(user, type);
+  if (usageCheck.reached) {
+    return {
+      error: {
+        status: 403,
+        payload: {
+          error: LIMIT_ERROR_LABELS[type] || 'Free plan limit reached',
+          message: getLimitMessage(type, usageCheck.limit)
+        }
+      },
+      user
+    };
+  }
+
+  return { user };
+};
+
+const incrementUserUsage = async (user, type) => {
+  if (!user) return;
+  const config = LIMIT_FIELD_CONFIG[type] || LIMIT_FIELD_CONFIG.analysis;
+  user.usage[config.usageKey] = (user.usage[config.usageKey] || 0) + 1;
+  if (config.usageKey === 'uploadsCount') {
+    user.usage.lastUpload = new Date();
+  }
+  try {
+    await user.save();
+  } catch (err) {
+    console.error('Failed to update user usage counters:', err.message);
+  }
+};
+
+const cleanupUploadedFile = (file) => {
+  if (file?.path) {
+    return fs.unlink(file.path).catch(() => {});
+  }
+  return Promise.resolve();
+};
+
 // Connect to MongoDB
 connectDB();
 
@@ -373,13 +523,7 @@ app.post('/api/auth/login', async (req, res) => {
         startDate: user.createdAt || new Date(),
         endDate: null,
         paymentId: null,
-        features: {
-          maxUploads: 3,
-          maxGenerations: 1,
-          hasTemplates: false,
-          hasAdvancedAI: false,
-          hasPrioritySupport: false
-        }
+        features: clonePlanFeatures('free')
       };
       needsMigration = true;
     }
@@ -537,6 +681,20 @@ app.post('/api/auth/change-password', async (req, res) => {
     console.log('File received:', req.file?.originalname);
     console.log('Path:', req.file?.path);
     console.log('MIME:', req.file?.mimetype);
+
+    const access = await requireUserForAction(req, 'analysis');
+    if (access.error) {
+      await cleanupUploadedFile(req.file);
+      return res.status(access.error.status).json(access.error.payload);
+    }
+    const actingUser = access.user;
+
+    const legacyAccess = await requireUserForAction(req, 'analysis');
+    if (legacyAccess.error) {
+      await cleanupUploadedFile(req.file);
+      return res.status(legacyAccess.error.status).json(legacyAccess.error.payload);
+    }
+    const legacyUser = legacyAccess.user;
 
     let resumeText = '';
     try {
@@ -758,6 +916,7 @@ app.post('/api/analyze/file-robust', upload.single('resume'), async (req, res) =
       // Clean up file
       await fs.unlink(req.file.path).catch(() => {});
 
+      await incrementUserUsage(actingUser, 'analysis');
       return res.json({
         success: true,
         fileName: req.file.originalname,
@@ -883,6 +1042,7 @@ Extract contact information if available in the resume text.`
       // Clean up the uploaded file
       await fs.unlink(req.file.path).catch(() => {});
 
+      await incrementUserUsage(actingUser, 'analysis');
       // Return JSON response that frontend expects
       return res.json({
         success: true,
@@ -1885,35 +2045,11 @@ app.post('/api/admin/change-user-plan', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const planFeatures = {
-      free: {
-        maxUploads: 3,
-        maxGenerations: 1,
-        hasTemplates: false,
-        hasAdvancedAI: false,
-        hasPrioritySupport: false
-      },
-      pro: {
-        maxUploads: 999999,
-        maxGenerations: 999999,
-        hasTemplates: true,
-        hasAdvancedAI: true,
-        hasPrioritySupport: true
-      },
-      team: {
-        maxUploads: 999999,
-        maxGenerations: 999999,
-        hasTemplates: true,
-        hasAdvancedAI: true,
-        hasPrioritySupport: true
-      }
-    };
-
     const oldPlan = user.plan.type;
     user.plan.type = planType;
     user.plan.status = 'active';
     user.plan.startDate = new Date();
-    user.plan.features = planFeatures[planType];
+    user.plan.features = clonePlanFeatures(planType);
 
     await user.save();
 
@@ -1996,13 +2132,7 @@ app.post('/api/admin/migrate-users', async (req, res) => {
             startDate: user.createdAt || new Date(),
             endDate: null,
             paymentId: null,
-            features: {
-              maxUploads: 3,
-              maxGenerations: 1,
-              hasTemplates: false,
-              hasAdvancedAI: false,
-              hasPrioritySupport: false
-            }
+            features: clonePlanFeatures('free')
           };
           needsUpdate = true;
         }

@@ -45,11 +45,11 @@ const userSchema = new mongoose.Schema({
     features: {
       maxUploads: {
         type: Number,
-        default: 3  // Free plan limit
+        default: 2  // Free plan limit
       },
       maxGenerations: {
         type: Number,
-        default: 1
+        default: 2
       },
       hasTemplates: {
         type: Boolean,

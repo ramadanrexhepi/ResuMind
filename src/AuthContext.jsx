@@ -7,13 +7,12 @@ export const AuthProvider = ({ children }) => {
   const API_BASE = (() => {
     try {
       const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-      const isLocal = host === 'localhost' || host === '127.0.0.1';
-      return (isLocal ? 'http://127.0.0.1:5050' : '') + '/api/auth';
+      const isLocal = host === 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/auth' || host === 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/auth';
+      return (isLocal ? 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/auth' : '') + '/api/auth';
     } catch (_) {
-      return 'http://127.0.0.1:5050/api/auth';
+      return 'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app/api/auth';
     }
   })();
-
   const signup = async (name, email, password) => {
     try {
       const res = await fetch(`${API_BASE}/signup`, {
