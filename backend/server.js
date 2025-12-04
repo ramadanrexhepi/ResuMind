@@ -207,7 +207,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'https://resu-mind-git-main-ramadanrexhepis-projects.vercel.app',
-  'https://resu-mind.vercel.app', // Add your production domain if different
+  'https://resu-mind.vercel.app',
+  'https://resumind.ramadanrexhepi.dev', // Custom domain frontend
   process.env.FRONTEND_URL // Allow environment variable override
 ].filter(Boolean); // Remove undefined values
 
