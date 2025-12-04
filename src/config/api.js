@@ -22,8 +22,9 @@ const getAPIBaseURL = () => {
     return 'http://localhost:5050';
   }
 
-  // Production fallback: use your Render backend
-  return 'https://api.resumind.ramadanrexhepi.dev';
+  // Production fallback: use direct Render URL (works immediately)
+  // TODO: Change to https://api.resumind.ramadanrexhepi.dev after DNS is set up
+  return 'https://resumind-vlu4.onrender.com';
 };
 
 export const API_BASE_URL = getAPIBaseURL();
