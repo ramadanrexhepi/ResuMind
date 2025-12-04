@@ -146,7 +146,7 @@ export default function GeneratorPage() {
     setIsGenerating(true);
   
     try {
-      const response = await fetch("API_ENDPOINTS.GENERATE_RESUME", {
+      const response = await fetch(API_ENDPOINTS.GENERATE_RESUME, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
