@@ -1720,8 +1720,18 @@ app.get('/api/analyses', async (req, res) => {
     console.log('✅ AI HTML resume generated. Rendering PDF...');
 
     const puppeteer = require('puppeteer');
+
+    // Find Chrome executable path (works on Render after install)
+    let executablePath;
+    try {
+      executablePath = puppeteer.executablePath();
+    } catch (error) {
+      console.log('⚠️  Using default Chrome path');
+    }
+
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: executablePath || process.env.PUPPETEER_EXECUTABLE_PATH,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
