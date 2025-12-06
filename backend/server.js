@@ -1462,16 +1462,29 @@ app.post('/api/analyze/linkedin', async (req, res) => {
     console.log('🔗 LinkedIn URL received:', url);
     if (portfolioUrl) console.log('🌐 Portfolio URL:', portfolioUrl);
 
+    // ========== SCRAPE REAL LINKEDIN PROFILE DATA ==========
+    const { scrapeLinkedInProfile } = require('./utils/linkedinScraper');
+    console.log('🕷️ Scraping LinkedIn profile...');
+    const profileData = await scrapeLinkedInProfile(url);
+
+    console.log('✅ Scraped profile for:', profileData.fullName);
+
     // ========== MOCK FALLBACK (if OpenAI not configured) ==========
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
-      console.log('⚠️ OpenAI not configured. Returning mock response.');
+      console.log('⚠️ OpenAI not configured. Returning mock response with scraped name.');
       return res.json({
         success: true,
         profileUrl: url,
         analyzedAt: new Date().toISOString(),
+        fullName: profileData.fullName,
+        headline: profileData.headline,
+        location: profileData.location,
         analysis: {
           score: 82,
-          profileStrength: 'Excellent',
+          overallRating: 'Excellent',
+          fullName: profileData.fullName,
+          headline: profileData.headline,
+          location: profileData.location,
           strengths: [
             '✅ Clear, keyword-rich headline',
             '✅ Strong networking presence and activity',
@@ -1483,11 +1496,6 @@ app.post('/api/analyze/linkedin', async (req, res) => {
             '🔧 Include more industry-specific keywords',
             '🔧 Engage with posts weekly to improve visibility'
           ],
-          recommendations: [
-            '💡 Expand the "About" section with quantified results',
-            '💡 List certifications and highlight top 3 skills',
-            '💡 Link featured portfolio projects'
-          ],
           suggestedKeywords: [
             'leadership', 'software development', 'cloud computing', 'React', 'Node.js'
           ]
@@ -1495,68 +1503,77 @@ app.post('/api/analyze/linkedin', async (req, res) => {
       });
     }
 
-    // ========== OPTIONAL: FETCH PAGE CONTENT ==========
-    const fetchText = async (u) => {
-      if (!u) return '';
-      try {
-        const r = await fetch(u, { timeout: 10000 });
-        if (!r.ok) return '';
-        const t = await r.text();
-        return t.replace(/<[^>]*>/g, ' ').slice(0, 80000);
-      } catch {
-        return '';
-      }
-    };
-
-    const linkedinContent = await fetchText(url);
-    const portfolioContent = await fetchText(portfolioUrl);
-
-    // ========== AI PROMPT ==========
-    console.log('🤖 Sending enriched LinkedIn data to OpenAI...');
+    // ========== AI PROMPT WITH REAL SCRAPED DATA ==========
+    console.log('🤖 Sending real LinkedIn data to OpenAI for analysis...');
 
     const prompt = `
 You are a professional LinkedIn strategist and profile optimization expert.
 
 TASK:
-Analyze the provided LinkedIn profile (and portfolio if present) and generate a structured JSON analysis.
+Analyze the provided LinkedIn profile data and generate a comprehensive, structured JSON analysis.
 
-The URLs are fully accessible. Extract factual insights (roles, achievements, tone, engagement level, keywords, etc.)
-directly from the page text, not assumptions. Provide practical, data-driven improvement guidance.
+REAL PROFILE DATA EXTRACTED:
+Full Name: ${profileData.fullName}
+Headline: ${profileData.headline}
+Location: ${profileData.location}
+About: ${profileData.about || 'Not provided'}
 
-DATA:
-LinkedIn URL: ${url}
-Portfolio URL: ${portfolioUrl || 'none'}
+Experience (${profileData.experience.length} positions):
+${profileData.experience.map((exp, i) => `${i+1}. ${exp.title} at ${exp.company} (${exp.duration})\n   ${exp.description || ''}`).join('\n')}
 
-LINKEDIN TEXT (truncated): ${linkedinText ? linkedinText.slice(0, 12000) : 'none'}
-PAGE CONTENT (auto-fetched): ${linkedinContent.slice(0, 8000)}
-PORTFOLIO CONTENT: ${portfolioContent.slice(0, 8000)}
+Education (${profileData.education.length} entries):
+${profileData.education.map((edu, i) => `${i+1}. ${edu.degree} from ${edu.school} (${edu.years})`).join('\n')}
 
-OUTPUT JSON SCHEMA:
+Skills: ${profileData.skills.join(', ')}
+
+Additional Context:
+${linkedinText ? `User-provided context: ${linkedinText.slice(0, 3000)}` : ''}
+${profileData.rawText ? `Page text: ${profileData.rawText.slice(0, 5000)}` : ''}
+
+OUTPUT JSON SCHEMA (REQUIRED FORMAT):
 {
+  "fullName": "${profileData.fullName}",
+  "headline": "${profileData.headline}",
+  "location": "${profileData.location}",
   "score": <0-100>,
-  "profileStrength": "<Excellent | Strong | Good | Needs Improvement>",
-  "summary": "<short overview of candidate tone and professional brand>",
-  "strengths": ["..."],
-  "improvements": ["..."],
-  "recommendations": ["..."],
-  "suggestedKeywords": ["keyword1", "keyword2", "keyword3"],
-  "industryMatch": "<which industries the profile aligns with best>",
-  "personalBrand": "<few words that describe the personal impression>"
+  "overallRating": "<Excellent | Strong | Good | Needs Improvement>",
+  "atsScore": <0-100>,
+  "atsCompatibility": "<High | Medium | Low>",
+  "strengths": ["strength 1", "strength 2", "strength 3"],
+  "improvements": ["improvement 1", "improvement 2", "improvement 3"],
+  "suggestedKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+  "sections": {
+    "present": ["section1", "section2"],
+    "missing": ["section1", "section2"]
+  },
+  "summary": "<2-3 sentence professional overview>",
+  "industryMatch": "<which industries this profile best aligns with>",
+  "careerLevel": "<Entry | Mid | Senior | Executive>"
 }
 
+ANALYSIS GUIDELINES:
+1. Score based on profile completeness, keyword richness, clarity, and professional presentation
+2. ATS Score should reflect how well this profile would translate to a resume for ATS systems
+3. Strengths should highlight what's working well (use ✅ emoji prefix)
+4. Improvements should be actionable and specific (use 🔧 emoji prefix)
+5. Keywords should be industry-relevant and based on actual profile content
+6. Present sections: what's included (About, Experience, Education, Skills, etc.)
+7. Missing sections: what could enhance the profile (Certifications, Projects, Recommendations, etc.)
+
 RESPONSE RULES:
-- Return ONLY valid JSON, no commentary or markdown.
-- Ratings and feedback must align with objective profile completeness and clarity.
+- Return ONLY valid JSON, no commentary or markdown
+- Be factual and specific based on actual profile data
+- Provide actionable, practical advice
 `;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: 'You are an expert LinkedIn profile analyst and strategist.' },
+        { role: 'system', content: 'You are an expert LinkedIn profile analyst and career strategist.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.6,
-      max_tokens: 2000,
+      max_tokens: 2500,
     });
 
     let aiResponse = completion.choices[0].message.content.trim();
@@ -1576,10 +1593,18 @@ RESPONSE RULES:
       }
     }
 
+    // Ensure required fields are present
+    aiAnalysis.fullName = aiAnalysis.fullName || profileData.fullName;
+    aiAnalysis.headline = aiAnalysis.headline || profileData.headline;
+    aiAnalysis.location = aiAnalysis.location || profileData.location;
+
     res.json({
       success: true,
       profileUrl: url,
       analyzedAt: new Date().toISOString(),
+      fullName: profileData.fullName,
+      headline: profileData.headline,
+      location: profileData.location,
       analysis: aiAnalysis,
     });
 

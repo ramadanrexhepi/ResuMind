@@ -145,16 +145,20 @@ export default function UploadPage() {
   
         const data = await response.json();
         console.log('LinkedIn analysis:', data);
-        
+
+        // Use real name from LinkedIn profile
+        const displayName = data.fullName || data.analysis?.fullName || 'LinkedIn Profile';
+        const fileName = displayName === 'LinkedIn Profile' ? displayName : `${displayName} - LinkedIn Profile`;
+
         // ✅ Store LinkedIn URL and text for later use
-        setAnalysisResults({ 
-          ...data, 
-          fileName: 'LinkedIn Profile', 
+        setAnalysisResults({
+          ...data,
+          fileName: fileName,
           type: 'linkedin',
           linkedinUrl: linkedinUrl,
           linkedinText: linkedinText
         });
-  
+
         // Persist
         try {
           await fetch(API_ENDPOINTS.SAVE_ANALYSIS, {
@@ -163,7 +167,7 @@ export default function UploadPage() {
             body: JSON.stringify({
               userId: savedUser?.id,
               analysisType: 'linkedin',
-              fileName: 'LinkedIn Profile',
+              fileName: fileName,
               fileSize: 0,
               analysis: data.analysis,
               linkedinUrl: linkedinUrl
