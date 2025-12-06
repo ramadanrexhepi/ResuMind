@@ -114,7 +114,7 @@ export default function DashboardPage() {
           
           // Fetch analyses for the user
           const userId = parsedUser.id || parsedUser._id;
-          const res = await fetch(`API_ENDPOINTS.USER_ANALYSES(userId)`, {
+          const res = await fetch(API_ENDPOINTS.USER_ANALYSES(userId), {
             headers: {
               'Authorization': `Bearer ${token}`
             }
