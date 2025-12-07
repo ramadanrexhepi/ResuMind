@@ -4,6 +4,7 @@ import { HiOutlineUpload, HiOutlineArrowLeft } from 'react-icons/hi';
 import { FaLinkedin } from 'react-icons/fa';
 import ResultsDisplay from './ResultsDisplay';
 import LoadingProgress from './components/LoadingProgress';
+import SEOHead from './components/SEOHead';
 import { API_BASE_URL, API_ENDPOINTS } from './config/api';
 
 export default function UploadPage() {
@@ -393,6 +394,11 @@ export default function UploadPage() {
 
   return (
     <div className="upload-page">
+      <SEOHead
+        title="Upload Resume - AI Analysis & Optimization | ResuMind"
+        description="Upload your resume or LinkedIn profile for instant AI-powered analysis. Get ATS scoring, personalized recommendations, and optimization suggestions to improve your job application success rate."
+        keywords="resume upload, resume analysis, ATS checker, LinkedIn analyzer, resume scanner, CV analysis, resume feedback"
+      />
       <button 
         onClick={() => window.navigate ? window.navigate('dashboard') : window.history.back()} 
         className="back-button"

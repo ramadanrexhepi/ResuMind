@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './GeneratorPage.css';
 import { HiOutlineArrowLeft, HiOutlineArrowRight, HiOutlineSparkles, HiOutlineCheck } from 'react-icons/hi';
+import SEOHead from './components/SEOHead';
 import { API_ENDPOINTS } from './config/api';
 
 export default function GeneratorPage() {
@@ -649,6 +650,11 @@ export default function GeneratorPage() {
 
   return (
     <div className="generator-page">
+      <SEOHead
+        title="Resume Generator - Create Professional Resume | ResuMind"
+        description="Generate a professional, ATS-optimized resume from scratch with AI assistance. Step-by-step builder helps you create the perfect resume in minutes."
+        keywords="resume generator, create resume, resume builder, professional resume, AI resume writer, resume maker, CV generator"
+      />
       {/* Header */}
       <div className="generator-header">
         <button 

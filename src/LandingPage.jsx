@@ -1,7 +1,8 @@
 import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';  // Add this import
+import { useNavigate, Link } from 'react-router-dom';
 import './LandingPage.css';
-import Carousel from './Carousel'
+import Carousel from './Carousel';
+import SEOHead from './components/SEOHead';
 //import resumeImage from './hero-resume.jpg';
 import { FiUpload } from 'react-icons/fi';
 import { LuSparkles } from 'react-icons/lu';
@@ -16,8 +17,8 @@ import {
   HiOutlineShieldCheck,
   HiOutlineCheck
 } from 'react-icons/hi';
-import Magnet from './Magnet'
-import Folder from './Folder'
+import Magnet from './Magnet';
+import Folder from './Folder';
 
 
 
@@ -26,6 +27,12 @@ export default function LandingPage() {
 
   return (
     <div className="landing-page">
+      <SEOHead
+        title="ResuMind - AI Resume Optimizer | Get Your Dream Job Faster"
+        description="Transform your resume with AI-powered analysis and optimization. Get instant ATS scoring, personalized recommendations, and professional resume generation. Join thousands who landed their dream jobs with ResuMind."
+        keywords="AI resume optimizer, ATS resume checker, resume analyzer, professional resume builder, LinkedIn profile optimizer, job application optimizer, career tools, resume generator, CV builder, resume ATS score"
+        canonical="https://resumind.ramadanrexhepi.dev"
+      />
       <nav className="navbar">
         <div className="container navbar-content">
           <div className="navbar-logo">
