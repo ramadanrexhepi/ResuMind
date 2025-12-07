@@ -2116,6 +2116,107 @@ app.post("/api/generate/resume-optimized", upload.single('resume'), async (req, 
 
 
 // ============================================
+// RESUME PREVIEW (HTML only, no PDF)
+// ============================================
+app.post("/api/generate/resume-preview", upload.single('resume'), async (req, res) => {
+  try {
+    console.log("👁️ Resume Preview Endpoint Hit");
+
+    const formData = {
+      ...req.body,
+      file: req.file
+    };
+
+    // Parse analysis if it's a JSON string
+    if (formData.analysis && typeof formData.analysis === 'string') {
+      try {
+        formData.analysis = JSON.parse(formData.analysis);
+      } catch (e) {
+        console.warn("⚠️ Could not parse analysis JSON");
+      }
+    }
+
+    // Generate HTML using the same AI logic
+    const htmlContent = await generateResumeHTML(formData);
+
+    // Return HTML instead of PDF
+    res.json({
+      success: true,
+      html: htmlContent,
+      message: "Resume preview generated successfully"
+    });
+
+  } catch (error) {
+    console.error("❌ Error in resume preview:", error);
+    res.status(500).json({
+      error: "Failed to generate resume preview",
+      message: error.message
+    });
+  }
+});
+
+// Helper function to generate resume HTML
+async function generateResumeHTML(formData) {
+  console.log("🎨 Generating resume HTML...");
+
+  const linkedinUrl = formData.linkedinUrl || formData.linkedin || "";
+  const portfolioUrl = formData.portfolioUrl || "";
+  const linkedinText = formData.linkedinText || "";
+  const providedFullName = formData.fullName || (formData.analysis && formData.analysis.fullName) || "";
+  const providedEmail = formData.email || (formData.analysis && formData.analysis.email) || "";
+  const providedPhone = formData.phone || (formData.analysis && formData.analysis.phone) || "";
+  const providedLocation = formData.location || (formData.analysis && formData.analysis.location) || "";
+
+  const prompt = `
+Generate a professional, ATS-optimized resume in HTML format.
+
+DATA PROVIDED:
+${linkedinUrl ? `LinkedIn URL: ${linkedinUrl}` : ''}
+${formData.analysis ? `Analysis: ${JSON.stringify(formData.analysis)}` : ''}
+${linkedinText ? `LinkedIn Text: ${linkedinText}` : ''}
+
+Contact Info:
+- Name: ${providedFullName || 'Extract from data'}
+- Email: ${providedEmail || 'Extract from data'}
+- Phone: ${providedPhone || 'Extract from data'}
+- Location: ${providedLocation || 'Extract from data'}
+
+REQUIREMENTS:
+1. Create a complete, professional resume with ALL sections
+2. Include: Contact, Professional Summary, Experience, Education, Skills
+3. Use modern, clean HTML/CSS styling
+4. Make it ATS-optimized (clear structure, no images, standard fonts)
+5. Format should be print-ready (A4 size)
+
+Return ONLY the HTML code, starting with <!DOCTYPE html>
+`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are an expert resume writer. Generate professional, ATS-optimized resumes in HTML format.'
+      },
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    temperature: 0.7,
+    max_tokens: 4000
+  });
+
+  let html = completion.choices[0].message.content.trim();
+
+  // Clean up markdown code blocks if present
+  html = html.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
+
+  console.log("✅ Resume HTML generated");
+  return html;
+}
+
+// ============================================
 // ADMIN ROUTES
 // ============================================
 

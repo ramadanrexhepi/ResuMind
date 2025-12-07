@@ -235,11 +235,80 @@ export default function UploadPage() {
     setLinkedinText('');
   };
 
-  const handleShowPreview = () => {
-    // Generate a mock HTML preview for the resume
-    const mockHTML = generatePreviewHTML(analysisResults);
-    setResumeHTML(mockHTML);
-    setShowPreview(true);
+  const handleShowPreview = async () => {
+    try {
+      setIsAnalyzing(true);
+      setProgressMessage('Generating resume preview...');
+      setProgressStep(0);
+
+      // Prepare form data for the preview request
+      const formData = new FormData();
+
+      // Add all analysis data
+      if (analysisResults?.analysis?.fullName) {
+        formData.append('fullName', analysisResults.analysis.fullName);
+      }
+      if (analysisResults?.analysis?.email) {
+        formData.append('email', analysisResults.analysis.email);
+      }
+      if (analysisResults?.analysis?.phone) {
+        formData.append('phone', analysisResults.analysis.phone);
+      }
+      if (analysisResults?.analysis?.location) {
+        formData.append('location', analysisResults.analysis.location);
+      }
+
+      // Add LinkedIn data if available
+      if (analysisResults?.type === 'linkedin') {
+        if (analysisResults.linkedinUrl) {
+          formData.append('linkedinUrl', analysisResults.linkedinUrl);
+        }
+        if (analysisResults.linkedinText) {
+          formData.append('linkedinText', analysisResults.linkedinText);
+        }
+      }
+
+      // Add file if available
+      if (analysisResults?.type === 'file' && (selectedFile || analysisResults.originalFile)) {
+        const fileToUpload = selectedFile || analysisResults.originalFile;
+        formData.append('resume', fileToUpload);
+      }
+
+      // Add complete analysis data
+      if (analysisResults?.analysis) {
+        formData.append('analysis', JSON.stringify(analysisResults.analysis));
+      }
+
+      setProgressMessage('AI is creating your optimized resume...');
+      setProgressStep(1);
+
+      // Call the preview endpoint to get HTML
+      const response = await fetch(API_ENDPOINTS.GENERATE_PREVIEW, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate preview');
+      }
+
+      const data = await response.json();
+
+      setProgressMessage('Preview ready!');
+      setProgressStep(2);
+
+      // Show the AI-generated HTML
+      setResumeHTML(data.html);
+      setShowPreview(true);
+
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      alert('Failed to generate preview: ' + error.message);
+    } finally {
+      setIsAnalyzing(false);
+      setProgressStep(0);
+      setProgressMessage('');
+    }
   };
 
   const generatePreviewHTML = (data) => {

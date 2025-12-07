@@ -44,6 +44,7 @@ export const API_ENDPOINTS = {
   // Generation
   GENERATE_RESUME: `${API_BASE_URL}/api/generate/resume-from-scratch`,
   GENERATE_OPTIMIZED: `${API_BASE_URL}/api/generate/resume-optimized`,
+  GENERATE_PREVIEW: `${API_BASE_URL}/api/generate/resume-preview`,
 
   // User
   USER_ANALYSES: (userId) => `${API_BASE_URL}/api/user/analyses/${userId}`,
