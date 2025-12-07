@@ -76,7 +76,7 @@ const ResumePreview = ({
                   srcDoc={editedHTML || resumeHTML}
                   title="Resume Preview"
                   className="resume-iframe"
-                  sandbox="allow-same-origin"
+                  sandbox="allow-same-origin allow-scripts"
                 />
               </div>
             </div>
@@ -131,7 +131,7 @@ const ResumePreview = ({
                     srcDoc={editedHTML || resumeHTML}
                     title="Optimized Resume Preview"
                     className="resume-iframe"
-                    sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-scripts"
                   />
                 </div>
               </div>
