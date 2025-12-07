@@ -3,6 +3,7 @@ import './UploadPage.css';
 import { HiOutlineUpload, HiOutlineArrowLeft } from 'react-icons/hi';
 import { FaLinkedin } from 'react-icons/fa';
 import ResultsDisplay from './ResultsDisplay';
+import LoadingProgress from './components/LoadingProgress';
 import { API_BASE_URL, API_ENDPOINTS } from './config/api';
 
 export default function UploadPage() {
@@ -16,6 +17,8 @@ export default function UploadPage() {
   const [uploadMethod, setUploadMethod] = useState('file');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
+  const [progressStep, setProgressStep] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
   const fileInputRef = useRef(null);
 
   const handleDrag = (e) => {
@@ -82,25 +85,38 @@ export default function UploadPage() {
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
-  
+    setProgressStep(0);
+
     try {
       if (uploadMethod === 'file' && selectedFile) {
+        setProgressMessage('Uploading your resume...');
+        setProgressStep(0);
+
         const formData = new FormData();
         formData.append('resume', selectedFile);
         if (savedUser?.id) formData.append('userId', savedUser.id);
-  
+
+        setProgressMessage('Processing document...');
+        setProgressStep(1);
+
         const response = await fetch(API_ENDPOINTS.ANALYZE_FILE, {
           method: 'POST',
           body: formData,
         });
-  
+
         if (!response.ok) {
           const errText = await response.text().catch(() => '');
-          throw new Error(`Upload failed (${response.status}): ${errText || 'Server error'}`);
+          throw new Error(`Upload failed: ${errText || 'Please check your file and try again.'}`);
         }
-  
+
+        setProgressMessage('Analyzing with AI...');
+        setProgressStep(2);
+
         const data = await response.json();
         console.log('Analysis result:', data);
+
+        setProgressMessage('Generating insights...');
+        setProgressStep(3);
   
         setAnalysisResults({ 
           ...data, 
@@ -127,24 +143,34 @@ export default function UploadPage() {
   
       } else if (uploadMethod === 'linkedin' && linkedinUrl) {
         if (!isValidLinkedinUrl(linkedinUrl)) {
-          alert('Please enter a valid LinkedIn profile URL');
-          setIsAnalyzing(false);
-          return;
+          throw new Error('Invalid LinkedIn URL format. Please use format: https://linkedin.com/in/yourname');
         }
-  
+
+        setProgressMessage('Connecting to LinkedIn...');
+        setProgressStep(0);
+
+        setProgressMessage('Extracting profile data...');
+        setProgressStep(1);
+
         const response = await fetch(API_ENDPOINTS.ANALYZE_LINKEDIN, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: linkedinUrl, linkedinText, userId: savedUser?.id }),
         });
-  
+
         if (!response.ok) {
           const errText = await response.text().catch(() => '');
-          throw new Error(`Analysis failed (${response.status}): ${errText || 'Server error'}`);
+          throw new Error(`LinkedIn analysis failed: ${errText || 'Please make sure you pasted your profile text or check your URL.'}`);
         }
-  
+
+        setProgressMessage('Analyzing your profile...');
+        setProgressStep(2);
+
         const data = await response.json();
         console.log('LinkedIn analysis:', data);
+
+        setProgressMessage('Generating recommendations...');
+        setProgressStep(3);
 
         // Use real name from LinkedIn profile
         const displayName = data.fullName || data.analysis?.fullName || 'LinkedIn Profile';
@@ -177,9 +203,24 @@ export default function UploadPage() {
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to analyze. Please try again.');
+      // Better error messages
+      let errorMessage = 'Analysis failed. ';
+
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage += 'Network error - please check your internet connection and try again.';
+      } else if (error.message.includes('LinkedIn')) {
+        errorMessage += error.message;
+      } else if (error.message.includes('Upload failed')) {
+        errorMessage += 'File upload error - please make sure your file is a valid PDF or DOCX under 10MB.';
+      } else {
+        errorMessage += error.message || 'Please try again or contact support if the issue persists.';
+      }
+
+      alert(errorMessage);
     } finally {
       setIsAnalyzing(false);
+      setProgressStep(0);
+      setProgressMessage('');
     }
   };
 
@@ -193,14 +234,26 @@ export default function UploadPage() {
   const handleDownloadResume = async () => {
     try {
       console.log('📥 Starting resume download...', analysisResults);
-      
+
+      setIsAnalyzing(true);
+      setProgressMessage('Preparing your resume...');
+      setProgressStep(0);
+
       const buildAndDownload = async (resp, filenameBase) => {
         if (!resp.ok) {
           const errorText = await resp.text();
           console.error('Server error:', errorText);
-          throw new Error('Resume generation failed');
+          throw new Error('Resume generation failed - please try again or contact support');
         }
+
+        setProgressMessage('Creating PDF...');
+        setProgressStep(2);
+
         const blob = await resp.blob();
+
+        setProgressMessage('Finalizing download...');
+        setProgressStep(3);
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -288,14 +341,17 @@ export default function UploadPage() {
       // ✅ Add analysis type
       formData.append('analysisType', analysisResults?.type || 'unknown');
   
+      setProgressMessage('Generating optimized resume...');
+      setProgressStep(1);
+
       console.log('🚀 Sending request to server...');
-      
+
       // ✅ Send to optimized resume endpoint
       const resp = await fetch(API_ENDPOINTS.GENERATE_OPTIMIZED, {
         method: 'POST',
         body: formData,
       });
-  
+
       console.log('✅ Response received:', resp.status);
       
       if (resp.status === 404) {
@@ -314,10 +370,24 @@ export default function UploadPage() {
       }
       
       console.log('🎉 Resume downloaded successfully!');
-  
+
     } catch (error) {
       console.error('❌ Error downloading resume:', error);
-      alert(`Failed to download resume: ${error.message}`);
+
+      let errorMessage = 'Failed to generate resume. ';
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage += 'Network error - please check your connection and try again.';
+      } else if (error.message.includes('generation failed')) {
+        errorMessage += 'Our AI encountered an issue. Please try again or contact support.';
+      } else {
+        errorMessage += error.message;
+      }
+
+      alert(errorMessage);
+    } finally {
+      setIsAnalyzing(false);
+      setProgressStep(0);
+      setProgressMessage('');
     }
   };
 
@@ -489,10 +559,23 @@ export default function UploadPage() {
 
       {/* Results Display */}
       {analysisResults && (
-        <ResultsDisplay 
+        <ResultsDisplay
           results={analysisResults}
           onClose={handleCloseResults}
           onDownloadResume={handleDownloadResume}
+        />
+      )}
+
+      {/* Loading Progress */}
+      {isAnalyzing && (
+        <LoadingProgress
+          steps={
+            uploadMethod === 'file'
+              ? ['Uploading resume', 'Processing document', 'AI analysis', 'Generating insights']
+              : ['Connecting to LinkedIn', 'Extracting data', 'AI analysis', 'Generating recommendations']
+          }
+          currentStep={progressStep}
+          message={progressMessage}
         />
       )}
     </div>
