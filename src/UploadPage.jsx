@@ -4,6 +4,7 @@ import { HiOutlineUpload, HiOutlineArrowLeft } from 'react-icons/hi';
 import { FaLinkedin } from 'react-icons/fa';
 import ResultsDisplay from './ResultsDisplay';
 import LoadingProgress from './components/LoadingProgress';
+import ResumePreview from './components/ResumePreview';
 import SEOHead from './components/SEOHead';
 import { API_BASE_URL, API_ENDPOINTS } from './config/api';
 
@@ -20,6 +21,8 @@ export default function UploadPage() {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [progressStep, setProgressStep] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [resumeHTML, setResumeHTML] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleDrag = (e) => {
@@ -230,6 +233,115 @@ export default function UploadPage() {
     setSelectedFile(null);
     setLinkedinUrl('');
     setLinkedinText('');
+  };
+
+  const handleShowPreview = () => {
+    // Generate a mock HTML preview for the resume
+    const mockHTML = generatePreviewHTML(analysisResults);
+    setResumeHTML(mockHTML);
+    setShowPreview(true);
+  };
+
+  const generatePreviewHTML = (data) => {
+    const fullName = data?.analysis?.fullName || 'Your Name';
+    const email = data?.analysis?.email || 'your.email@example.com';
+    const phone = data?.analysis?.phone || '(123) 456-7890';
+    const location = data?.analysis?.location || 'City, State';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 40px;
+            line-height: 1.6;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #2563eb;
+          }
+          h1 {
+            margin: 0;
+            font-size: 32px;
+            color: #1f2937;
+          }
+          .contact {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6b7280;
+          }
+          .section {
+            margin: 30px 0;
+          }
+          .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #e5e7eb;
+          }
+          .content {
+            margin-left: 20px;
+          }
+          .preview-note {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #92400e;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="preview-note">
+          📝 <strong>Preview Mode:</strong> This is a preview of your optimized resume. The final PDF will have professional formatting and styling.
+        </div>
+
+        <div class="header">
+          <h1>${fullName}</h1>
+          <div class="contact">
+            ${email} • ${phone} • ${location}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Professional Summary</div>
+          <div class="content">
+            Results-driven professional with proven expertise in delivering high-quality work.
+            Strong analytical and problem-solving skills with a track record of success.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Key Strengths</div>
+          <div class="content">
+            ${data?.analysis?.strengths?.map(s => `• ${s}`).join('<br>') || 'Loading strengths...'}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Skills</div>
+          <div class="content">
+            ${data?.analysis?.suggestedKeywords?.join(' • ') || 'Professional skills'}
+          </div>
+        </div>
+
+        <div class="preview-note">
+          ✨ <strong>Note:</strong> The complete resume will include your full experience, education, and accomplishments with ATS-optimized formatting.
+        </div>
+      </body>
+      </html>
+    `;
   };
 
   const handleDownloadResume = async () => {
@@ -568,7 +680,7 @@ export default function UploadPage() {
         <ResultsDisplay
           results={analysisResults}
           onClose={handleCloseResults}
-          onDownloadResume={handleDownloadResume}
+          onDownloadResume={handleShowPreview}
         />
       )}
 
@@ -582,6 +694,27 @@ export default function UploadPage() {
           }
           currentStep={progressStep}
           message={progressMessage}
+        />
+      )}
+
+      {/* Resume Preview Modal */}
+      {showPreview && resumeHTML && (
+        <ResumePreview
+          resumeHTML={resumeHTML}
+          originalData={analysisResults}
+          onDownload={() => {
+            setShowPreview(false);
+            handleDownloadResume();
+          }}
+          onEdit={(editedHTML) => {
+            setResumeHTML(editedHTML);
+          }}
+          onClose={() => setShowPreview(false)}
+          onRegenerate={() => {
+            setShowPreview(false);
+            alert('Regenerate feature coming soon! For now, please upload again to get a new analysis.');
+          }}
+          isGenerating={isAnalyzing}
         />
       )}
     </div>
