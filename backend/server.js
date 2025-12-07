@@ -1463,11 +1463,31 @@ app.post('/api/analyze/linkedin', async (req, res) => {
     if (portfolioUrl) console.log('🌐 Portfolio URL:', portfolioUrl);
 
     // ========== SCRAPE REAL LINKEDIN PROFILE DATA ==========
-    const { scrapeLinkedInProfile } = require('./utils/linkedinScraper');
-    console.log('🕷️ Scraping LinkedIn profile...');
-    const profileData = await scrapeLinkedInProfile(url);
+    console.log('📋 Analyzing LinkedIn profile...');
+    console.log('🔗 URL:', url);
+    console.log('📝 User provided text length:', linkedinText ? linkedinText.length : 0);
 
-    console.log('✅ Scraped profile for:', profileData.fullName);
+    let profileData = {
+      fullName: '',
+      headline: '',
+      location: '',
+      about: '',
+      experience: [],
+      education: [],
+      skills: [],
+      rawText: linkedinText || ''
+    };
+
+    // Try to scrape only if no text provided (scraping often fails due to LinkedIn auth)
+    if (!linkedinText || linkedinText.length < 100) {
+      console.log('⚠️ No profile text provided, attempting to scrape (may fail due to LinkedIn login requirement)...');
+      const { scrapeLinkedInProfile } = require('./utils/linkedinScraper');
+      const scrapedData = await scrapeLinkedInProfile(url);
+      profileData = { ...profileData, ...scrapedData };
+      console.log('🕷️ Scrape result - Name:', profileData.fullName, 'Experience:', profileData.experience.length);
+    } else {
+      console.log('✅ Using user-provided LinkedIn text for analysis');
+    }
 
     // ========== MOCK FALLBACK (if OpenAI not configured) ==========
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
@@ -1510,59 +1530,69 @@ app.post('/api/analyze/linkedin', async (req, res) => {
 You are a professional LinkedIn strategist and profile optimization expert.
 
 TASK:
-Analyze the provided LinkedIn profile data and generate a comprehensive, structured JSON analysis.
+Analyze the provided LinkedIn profile and generate a comprehensive, structured JSON analysis.
+You MUST extract the person's REAL name, headline, and location from the profile text.
 
-REAL PROFILE DATA EXTRACTED:
-Full Name: ${profileData.fullName}
+LINKEDIN PROFILE DATA:
+LinkedIn URL: ${url}
+${portfolioUrl ? `Portfolio URL: ${portfolioUrl}` : ''}
+
+=== FULL PROFILE TEXT/DATA ===
+${linkedinText || profileData.rawText || 'No text provided'}
+
+${profileData.fullName && profileData.fullName !== 'Profile User' ? `
+Pre-extracted data (if available):
+Name: ${profileData.fullName}
 Headline: ${profileData.headline}
 Location: ${profileData.location}
-About: ${profileData.about || 'Not provided'}
+About: ${profileData.about || 'N/A'}
 
 Experience (${profileData.experience.length} positions):
-${profileData.experience.map((exp, i) => `${i+1}. ${exp.title} at ${exp.company} (${exp.duration})\n   ${exp.description || ''}`).join('\n')}
+${profileData.experience.map((exp, i) => `${i+1}. ${exp.title} at ${exp.company} (${exp.duration})\n   ${exp.description || ''}`).join('\n') || 'None listed'}
 
 Education (${profileData.education.length} entries):
-${profileData.education.map((edu, i) => `${i+1}. ${edu.degree} from ${edu.school} (${edu.years})`).join('\n')}
+${profileData.education.map((edu, i) => `${i+1}. ${edu.degree} from ${edu.school} (${edu.years})`).join('\n') || 'None listed'}
 
-Skills: ${profileData.skills.join(', ')}
-
-Additional Context:
-${linkedinText ? `User-provided context: ${linkedinText.slice(0, 3000)}` : ''}
-${profileData.rawText ? `Page text: ${profileData.rawText.slice(0, 5000)}` : ''}
+Skills: ${profileData.skills.join(', ') || 'None listed'}
+` : ''}
 
 OUTPUT JSON SCHEMA (REQUIRED FORMAT):
 {
-  "fullName": "${profileData.fullName}",
-  "headline": "${profileData.headline}",
-  "location": "${profileData.location}",
+  "fullName": "<EXTRACT THE ACTUAL PERSON'S NAME FROM THE PROFILE - REQUIRED>",
+  "headline": "<EXTRACT THEIR HEADLINE/JOB TITLE - REQUIRED>",
+  "location": "<EXTRACT THEIR LOCATION IF AVAILABLE>",
   "score": <0-100>,
   "overallRating": "<Excellent | Strong | Good | Needs Improvement>",
   "atsScore": <0-100>,
   "atsCompatibility": "<High | Medium | Low>",
-  "strengths": ["strength 1", "strength 2", "strength 3"],
-  "improvements": ["improvement 1", "improvement 2", "improvement 3"],
+  "strengths": ["✅ strength 1", "✅ strength 2", "✅ strength 3"],
+  "improvements": ["🔧 improvement 1", "🔧 improvement 2", "🔧 improvement 3"],
   "suggestedKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "sections": {
-    "present": ["section1", "section2"],
-    "missing": ["section1", "section2"]
+    "present": ["About", "Experience", "Education", "Skills"],
+    "missing": ["Certifications", "Projects"]
   },
   "summary": "<2-3 sentence professional overview>",
   "industryMatch": "<which industries this profile best aligns with>",
   "careerLevel": "<Entry | Mid | Senior | Executive>"
 }
 
-ANALYSIS GUIDELINES:
-1. Score based on profile completeness, keyword richness, clarity, and professional presentation
-2. ATS Score should reflect how well this profile would translate to a resume for ATS systems
-3. Strengths should highlight what's working well (use ✅ emoji prefix)
-4. Improvements should be actionable and specific (use 🔧 emoji prefix)
-5. Keywords should be industry-relevant and based on actual profile content
-6. Present sections: what's included (About, Experience, Education, Skills, etc.)
-7. Missing sections: what could enhance the profile (Certifications, Projects, Recommendations, etc.)
+CRITICAL REQUIREMENTS:
+1. **EXTRACT THE REAL NAME** - Look for the person's name in the profile text (usually at the top)
+2. **EXTRACT THE REAL HEADLINE** - Their job title/professional tagline
+3. **EXTRACT THE REAL LOCATION** - Their city/country if mentioned
+4. Score based on profile completeness, keyword richness, clarity, and professional presentation
+5. ATS Score should reflect how well this profile would translate to a resume for ATS systems
+6. Strengths should highlight what's working well (use ✅ emoji prefix)
+7. Improvements should be actionable and specific (use 🔧 emoji prefix)
+8. Keywords should be industry-relevant and based on actual profile content
+9. Present sections: what's actually included in the profile
+10. Missing sections: what could enhance the profile
 
 RESPONSE RULES:
 - Return ONLY valid JSON, no commentary or markdown
 - Be factual and specific based on actual profile data
+- The fullName, headline, and location MUST come from the actual profile, not be generic
 - Provide actionable, practical advice
 `;
 

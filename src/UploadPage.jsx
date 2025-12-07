@@ -395,10 +395,11 @@ export default function UploadPage() {
             <div className="linkedin-icon-wrapper">
               <FaLinkedin className="linkedin-icon" />
             </div>
-            <h3 className="linkedin-title">Paste Your LinkedIn Profile URL</h3>
-            <p className="linkedin-subtitle">We'll analyze your profile and generate insights</p>
-            
+            <h3 className="linkedin-title">Analyze Your LinkedIn Profile</h3>
+            <p className="linkedin-subtitle">We'll extract your information and provide AI-powered insights</p>
+
             <div className="linkedin-input-wrapper">
+              <label className="input-label">LinkedIn Profile URL</label>
               <input
                 type="url"
                 placeholder="https://www.linkedin.com/in/yourname"
@@ -406,11 +407,39 @@ export default function UploadPage() {
                 onChange={handleLinkedinChange}
                 className="linkedin-input"
               />
+              <p className="input-help">
+                Go to your LinkedIn profile and copy the URL from your browser
+              </p>
             </div>
 
-            <p className="linkedin-help">
-              Go to your LinkedIn profile and copy the URL from your browser
-            </p>
+            <div className="linkedin-text-wrapper" style={{ marginTop: '20px' }}>
+              <label className="input-label">
+                Profile Text (Recommended for better accuracy)
+                <span style={{ fontSize: '12px', fontWeight: 'normal', marginLeft: '8px', color: '#666' }}>
+                  - Copy your entire LinkedIn profile and paste here
+                </span>
+              </label>
+              <textarea
+                placeholder="Paste your LinkedIn profile text here... Include your name, headline, about section, experience, education, and skills for the most accurate AI analysis."
+                value={linkedinText}
+                onChange={handleLinkedinTextChange}
+                className="linkedin-textarea"
+                rows="8"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                  marginTop: '8px'
+                }}
+              />
+              <p className="input-help" style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                💡 <strong>How to copy:</strong> Open your LinkedIn profile, select all text (Ctrl+A / Cmd+A), copy (Ctrl+C / Cmd+C), and paste here. This helps our AI extract your real name and provide accurate analysis.
+              </p>
+            </div>
           </div>
         )}
 
