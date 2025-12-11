@@ -49,6 +49,9 @@ export const API_ENDPOINTS = {
   // User
   USER_ANALYSES: (userId) => `${API_BASE_URL}/api/user/analyses/${userId}`,
 
+  // AI Chat
+  CHAT_WITH_AI: `${API_BASE_URL}/api/chat/ask`,
+
   // Health
   HEALTH: `${API_BASE_URL}/api/health`,
 };

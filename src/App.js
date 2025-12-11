@@ -11,7 +11,7 @@ import PrivacyPolicy from './PrivacyPolicy';
 import TermsOfService from './TermsOfService';
 import BillingPage from './BillingPage';
 import SettingsPage from './SettingsPage';
-//import AnalysesPage from './AnalysesPage';
+import AnalysesPage from './AnalysesPage';
 import UpgradePage from './UpgradePage';
 
 function App() {
@@ -20,8 +20,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-         {/* <Route path="/analyses" element={<AnalysesPage />} /> */}
-         <Route path="/upgrade" element={<UpgradePage />} />
+          <Route path="/analyses" element={<AnalysesPage />} />
+          <Route path="/upgrade" element={<UpgradePage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/result" element={<ResultsDisplay/>} />
           <Route path="/auth" element={<AuthPage />} />
