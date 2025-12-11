@@ -120,4 +120,37 @@
     transform-origin: bottom;
     transition: all 0.3s ease-in-out;
   }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .folder__back {
+      width: 80px;
+      height: 64px;
+    }
+
+    .folder__back::after {
+      width: 24px;
+      height: 8px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .folder__back {
+      width: 60px;
+      height: 48px;
+    }
+
+    .folder__back::after {
+      width: 18px;
+      height: 6px;
+    }
+
+    .paper {
+      border-radius: 6px;
+    }
+
+    .folder__front {
+      border-radius: 4px 8px 8px 8px;
+    }
+  }
   

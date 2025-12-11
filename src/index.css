@@ -43,6 +43,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-2) 100%);
   color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
 }
 
 code {

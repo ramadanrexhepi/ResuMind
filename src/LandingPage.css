@@ -15,12 +15,15 @@
   background: linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-2) 100%);
   color: var(--text-primary);
   line-height: 1.5;
+  overflow-x: hidden;
 }
 
 .container {
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 120px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Hero Section */
@@ -142,19 +145,23 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 500px;
+  width: 100%;
+  max-width: 500px;
 }
 
 .hero-image {
-  width: 500px;
-  height: 350px;
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  min-height: 250px;
   object-fit: cover;        /* Crop to fit */
   border-radius: 8px;       /* Rounded corners */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .placeholder-image {
-  width: 500px;
+  width: 100%;
+  max-width: 500px;
   height: 350px;
   background: var(--border);
   border-radius: 8px;
@@ -1009,7 +1016,7 @@
 /* Responsive Design - Tablet */
 @media (max-width: 1024px) {
   .container {
-    padding: 0 80px;
+    padding: 0 60px;
   }
 
   .steps {
@@ -1020,37 +1027,57 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
   }
+
+  .navbar-content {
+    padding: 1rem 60px;
+  }
 }
 
 /* Responsive Design - Mobile */
 @media (max-width: 768px) {
   .container {
-    padding: 0 32px;
+    padding: 0 24px;
   }
 
   .hero-content {
     grid-template-columns: 1fr;
-    gap: 48px;
+    gap: 32px;
   }
 
-  
+  .hero {
+    padding: 60px 0 40px 0;
+  }
+
   .hero-left h1 {
     font-size: 36px;
   }
 
+  .hero-left p {
+    font-size: 16px;
+  }
+
   .placeholder-image {
     width: 100%;
-    max-width: 500px;
+    max-width: 100%;
+    height: 280px;
   }
 
   .steps {
     grid-template-columns: 1fr;
-    gap: 48px;
+    gap: 32px;
+  }
+
+  .step {
+    padding: 8%;
+  }
+
+  .how-it-works {
+    padding: 60px 0;
   }
 
   .how-it-works h2 {
     font-size: 28px;
-    margin-bottom: 48px;
+    margin-bottom: 40px;
   }
 
   .features {
@@ -1073,6 +1100,19 @@
   .feature-card {
     padding: 28px 20px;
     min-height: auto;
+  }
+
+  .navbar-content {
+    padding: 0.75rem 24px;
+  }
+
+  .logo-text {
+    font-size: 1.25rem;
+  }
+
+  .navbar-cta {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -1382,21 +1422,46 @@
 }
 /* Responsive Design - Small Mobile */
 @media (max-width: 480px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .hero {
+    padding: 50px 0 30px 0;
+  }
+
+  .hero-content {
+    gap: 24px;
+  }
+
   .hero-left h1 {
-    font-size: 32px;
+    font-size: 28px;
+    margin-bottom: 16px;
   }
 
   .hero-left p {
-    font-size: 16px;
+    font-size: 15px;
+    margin-bottom: 24px;
   }
 
   .btn-primary {
     width: 100%;
+    height: 48px;
+    line-height: 48px;
+    font-size: 15px;
   }
 
   .placeholder-image {
-    height: 280px;
-    font-size: 20px;
+    height: 220px;
+    font-size: 18px;
+  }
+
+  .steps {
+    gap: 24px;
+  }
+
+  .step {
+    padding: 6%;
   }
 
   .step h3 {
@@ -1404,6 +1469,88 @@
   }
 
   .step p {
+    font-size: 14px;
+  }
+
+  .step-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 20px;
+  }
+
+  .icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .how-it-works {
+    padding: 40px 0;
+  }
+
+  .how-it-works h2 {
+    font-size: 24px;
+    margin-bottom: 32px;
+  }
+
+  .features {
+    padding: 40px 0;
+  }
+
+  .features-header {
+    margin-bottom: 40px;
+  }
+
+  .features-header h2 {
+    font-size: 24px;
+  }
+
+  .features-subtitle {
     font-size: 15px;
+  }
+
+  .navbar-content {
+    padding: 0.625rem 16px;
+  }
+
+  .logo-text {
+    font-size: 1.125rem;
+  }
+
+  .navbar-cta {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+
+  .pricing {
+    padding: 40px 0;
+  }
+
+  .pricing-title {
+    font-size: 24px;
+    margin-bottom: 32px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+  .container {
+    padding: 0 12px;
+  }
+
+  .hero-left h1 {
+    font-size: 24px;
+  }
+
+  .navbar-content {
+    padding: 0.5rem 12px;
+  }
+
+  .logo-text {
+    font-size: 1rem;
+  }
+
+  .navbar-cta {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.75rem;
   }
 }

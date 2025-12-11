@@ -325,12 +325,20 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  .generator-page {
+    padding: 16px;
+  }
+
   .generator-card {
     padding: 24px;
   }
 
   .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .step-content h2 {
+    font-size: 24px;
   }
 
   .step-navigation {
@@ -345,5 +353,59 @@
   .nav-btn {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .generator-page {
+    padding: 12px;
+  }
+
+  .generator-card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .step-content h2 {
+    font-size: 22px;
+  }
+
+  .step-description {
+    font-size: 15px;
+  }
+
+  .back-button {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  .experience-block {
+    padding: 20px;
+  }
+
+  .nav-btn {
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .generator-card {
+    padding: 16px;
+  }
+
+  .step-content h2 {
+    font-size: 20px;
+  }
+
+  .experience-block {
+    padding: 16px;
   }
 }

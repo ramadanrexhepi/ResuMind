@@ -330,3 +330,56 @@
     padding: 0 20px 20px;
   }
 }
+
+@media (max-width: 480px) {
+  .results-overlay {
+    padding: 0;
+  }
+
+  .results-container {
+    border-radius: 0;
+    max-height: 100vh;
+  }
+
+  .results-header {
+    padding: 16px;
+  }
+
+  .results-header h2 {
+    font-size: 20px;
+  }
+
+  .close-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .score-section {
+    padding: 20px 16px;
+  }
+
+  .score-circle {
+    width: 100px;
+    height: 100px;
+  }
+
+  .score-number {
+    font-size: 30px;
+  }
+
+  .results-grid,
+  .sections-status,
+  .keywords-section {
+    padding: 0 16px 16px;
+  }
+
+  .results-actions {
+    padding: 16px;
+  }
+
+  .action-btn {
+    min-height: 44px;
+    font-size: 13px;
+    padding: 10px 20px;
+  }
+}

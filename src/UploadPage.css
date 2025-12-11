@@ -373,11 +373,21 @@
 /* Responsive - Mobile */
 @media (max-width: 480px) {
   .upload-page {
-    padding: 24px 16px;
+    padding: 20px 12px;
+  }
+
+  .top-buttons {
+    padding: 0 12px;
+    top: 16px;
   }
 
   .back-button {
     margin-bottom: 40px;
+    font-size: 14px;
+  }
+
+  .upload-container {
+    max-width: 100%;
   }
 
   .upload-title {
@@ -386,6 +396,11 @@
 
   .upload-subtitle {
     font-size: 15px;
+    margin-bottom: 32px;
+  }
+
+  .upload-toggle {
+    margin-bottom: 32px;
   }
 
   .drop-zone {
@@ -415,9 +430,18 @@
     font-size: 15px;
   }
 
+  .drop-subtext {
+    font-size: 13px;
+  }
+
   .choose-file-btn {
     padding: 10px 24px;
     font-size: 15px;
+    min-height: 44px;
+  }
+
+  .analyze-btn {
+    min-height: 44px;
   }
 
   .file-info-compact,
@@ -429,5 +453,34 @@
 
   .remove-btn {
     align-self: flex-end;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .linkedin-title {
+    font-size: 20px;
+  }
+
+  .linkedin-subtitle {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 360px) {
+  .upload-page {
+    padding: 16px 8px;
+  }
+
+  .upload-title {
+    font-size: 24px;
+  }
+
+  .top-buttons {
+    padding: 0 8px;
+  }
+
+  .drop-zone,
+  .linkedin-section {
+    padding: 32px 16px;
   }
 }

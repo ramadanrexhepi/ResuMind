@@ -340,10 +340,11 @@
   .auth-container {
     border-radius: 0;
     min-height: 100vh;
+    box-shadow: none;
   }
 
   .auth-form-container {
-    padding: 40px 24px;
+    padding: 32px 20px;
   }
 
   .form-title {
@@ -352,5 +353,30 @@
 
   .brand-content h1 {
     font-size: 28px;
+  }
+
+  .auth-toggle button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .btn-submit,
+  .btn-social,
+  .input-wrapper input {
+    height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .auth-form-container {
+    padding: 24px 16px;
+  }
+
+  .form-title {
+    font-size: 22px;
+  }
+
+  .auth-toggle {
+    margin-bottom: 24px;
   }
 }
