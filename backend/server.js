@@ -1729,6 +1729,99 @@ app.get('/api/analyses', async (req, res) => {
 });
 
 // ============================================
+// AI CHAT ROUTES
+// ============================================
+
+app.post('/api/chat/ask', async (req, res) => {
+  try {
+    const { message, context } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message is required'
+      });
+    }
+
+    console.log('💬 AI Chat request:', message.substring(0, 50) + '...');
+
+    // Build context from user's analyses
+    let contextInfo = '';
+    if (context && context.analyses && context.analyses.length > 0) {
+      const analyses = context.analyses;
+      const avgScore = context.averageScore || 0;
+
+      contextInfo = `
+User has ${analyses.length} resume analysis(es) with an average score of ${avgScore}.
+
+Recent analyses:
+${analyses.slice(0, 3).map((a, i) =>
+  `${i + 1}. ${a.fileName}: Score ${a.score}/100, ATS: ${a.atsScore}/100, Rating: ${a.rating}`
+).join('\n')}
+`;
+    }
+
+    // Create AI prompt
+    const systemPrompt = `You are an expert resume and career advisor AI assistant. You help users understand their resume analyses and provide actionable advice to improve their resumes.
+
+${contextInfo}
+
+Guidelines:
+- Be friendly, professional, and encouraging
+- Provide specific, actionable advice
+- Use the user's analysis data when relevant
+- Keep responses concise (2-3 paragraphs max)
+- Focus on ATS optimization, keyword usage, and formatting
+- If asked about scores, reference their actual data
+- Suggest concrete improvements based on common resume best practices`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    const response = completion.choices[0].message.content;
+
+    console.log('✅ AI response generated');
+
+    res.json({
+      success: true,
+      response: response
+    });
+
+  } catch (error) {
+    console.error('❌ Error in AI chat:', error);
+
+    // Provide helpful fallback response
+    const fallbackResponse = `I'm here to help you improve your resume! While I'm having a technical issue right now, here are some general tips:
+
+📊 **For Higher ATS Scores:**
+- Use standard section headings (Experience, Education, Skills)
+- Include relevant keywords from job descriptions
+- Use a clean, single-column format
+- Save as PDF or DOCX
+
+💡 **Quick Improvements:**
+- Quantify your achievements with numbers and metrics
+- Start bullet points with strong action verbs
+- Tailor your resume to each job application
+- Keep it to 1-2 pages maximum
+
+Would you like specific advice on any of these areas?`;
+
+    res.json({
+      success: true,
+      response: fallbackResponse
+    });
+  }
+});
+
+// ============================================
 // GENERATION ROUTES
 // ============================================
 
